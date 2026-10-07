@@ -33,8 +33,8 @@ class _OfflineWidgetState extends State<OfflineWidget> {
   
   // Three states management
   ClockState _currentState = ClockState.clockAndSun;
-  double _userSunDirection = 180.0; // User input for sun direction (azimuth)
-  final TextEditingController _sunController = TextEditingController(text: '180.0');
+  double _sunClockHours = 12.0; // State 2: Sun direction represented in clock units (0 - 24 hours)
+  final TextEditingController _sunController = TextEditingController(text: '12.0');
 
   DateTime get _now {
     final raw = widget.timeProvider != null ? widget.timeProvider!() : DateTime.now();
@@ -67,9 +67,12 @@ class _OfflineWidgetState extends State<OfflineWidget> {
   Widget build(BuildContext context) {
     final double physicalNorthHeading = _physicalNorth;
 
-    // Sun Vector calculations
-    final double sunAzimuth = _userSunDirection;
+    // State 2 sun direction in clock units mapped to azimuth (1 hour = 15°)
+    final double sunAzimuth = _sunClockHours * 15.0;
     final double sunElevation = 90.0 - (((_currentTime.hour - 12).abs()) * 7.5);
+
+    // State 3 formula: north vector formula incorporating State 2 sun direction clock unit input
+    final double compliantNorthAngle = physicalNorthHeading + sunAzimuth;
 
     // Format clock representation (HH:MM:SS)
     final String timeString =
@@ -106,7 +109,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
             child: Center(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
-                child: _buildCurrentStateView(timeString, physicalNorthHeading, sunAzimuth, sunElevation),
+                child: _buildCurrentStateView(timeString, physicalNorthHeading, sunAzimuth, sunElevation, compliantNorthAngle),
               ),
             ),
           ),
@@ -131,7 +134,13 @@ class _OfflineWidgetState extends State<OfflineWidget> {
     );
   }
 
-  Widget _buildCurrentStateView(String timeString, double physicalNorthHeading, double sunAzimuth, double sunElevation) {
+  Widget _buildCurrentStateView(
+    String timeString,
+    double physicalNorthHeading,
+    double sunAzimuth,
+    double sunElevation,
+    double compliantNorthAngle,
+  ) {
     switch (_currentState) {
       case ClockState.clockAndSun:
         return Column(
@@ -142,8 +151,9 @@ class _OfflineWidgetState extends State<OfflineWidget> {
             Text('Sun Intensity: $offlineSun', style: const TextStyle(fontSize: 20)),
             const SizedBox(height: 10),
             Text(
-              'Sun Vector: Azimuth ${sunAzimuth.toStringAsFixed(1)}°, Elev ${sunElevation.toStringAsFixed(1)}°',
+              'Sun Vector (Clock Unit: ${_sunClockHours.toStringAsFixed(1)}h): Azimuth ${sunAzimuth.toStringAsFixed(1)}°, Elev ${sunElevation.toStringAsFixed(1)}°',
               style: const TextStyle(fontSize: 14, color: Colors.amber, fontWeight: FontWeight.w600),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
             LuxuryCircularClock(
@@ -167,34 +177,41 @@ class _OfflineWidgetState extends State<OfflineWidget> {
             ),
             const SizedBox(height: 20),
             const Text(
-              'Enter physical solar azimuth angle (0° - 360°):',
-              style: TextStyle(fontSize: 16, color: Colors.white70),
+              'Enter sun direction in clock units (Solar Hours 0.0 - 24.0h):\n(1 hour = 15° Azimuth)',
+              style: TextStyle(fontSize: 16, color: Colors.black),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
-            SizedBox(
-              width: 250,
-              child: TextField(
-                controller: _sunController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Sun Azimuth (°)',
-                  labelStyle: const TextStyle(color: Color(0xFFD4AF37)),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: const BorderSide(color: Color(0xFFD4AF37)),
-                    borderRadius: BorderRadius.circular(8),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white, // Light container background for black text in State 2
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: SizedBox(
+                width: 250,
+                child: TextField(
+                  controller: _sunController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18), // Input text color as black
+                  decoration: InputDecoration(
+                    labelText: 'Sun Clock Units (Hours)',
+                    labelStyle: const TextStyle(color: Colors.black87),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: const BorderSide(color: Color(0xFFD4AF37)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: const BorderSide(color: Colors.amber, width: 2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: const BorderSide(color: Colors.amber, width: 2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                  onSubmitted: (value) {
+                    setState(() {
+                      _sunClockHours = double.tryParse(value) ?? _sunClockHours;
+                    });
+                  },
                 ),
-                onSubmitted: (value) {
-                  setState(() {
-                    _userSunDirection = double.tryParse(value) ?? _userSunDirection;
-                  });
-                },
               ),
             ),
             const SizedBox(height: 20),
@@ -202,15 +219,16 @@ class _OfflineWidgetState extends State<OfflineWidget> {
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black),
               onPressed: () {
                 setState(() {
-                  _userSunDirection = double.tryParse(_sunController.text) ?? _userSunDirection;
+                  _sunClockHours = double.tryParse(_sunController.text) ?? _sunClockHours;
                 });
               },
-              child: const Text('Apply Sun Direction', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text('Apply Sun Clock Units', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 30),
             Text(
-              'Current Active Sun Azimuth: ${_userSunDirection.toStringAsFixed(1)}°',
+              'Active Sun Clock Units: ${_sunClockHours.toStringAsFixed(1)}h (Azimuth: ${sunAzimuth.toStringAsFixed(1)}°)',
               style: const TextStyle(fontSize: 18, color: Colors.amber),
+              textAlign: TextAlign.center,
             ),
           ],
         );
@@ -237,21 +255,22 @@ class _OfflineWidgetState extends State<OfflineWidget> {
                   const SizedBox(height: 10),
                   Text(
                     'Physical Compass North: ${physicalNorthHeading.toStringAsFixed(1)}°',
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.blue),
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blue),
                   ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'North direction vector is actively transformed on the luxury clock dial.',
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Compliant North Vector Formula:\nCompass Heading + (Sun Clock Units × 15°)\n= ${compliantNorthAngle.toStringAsFixed(1)}°',
+                    style: const TextStyle(fontSize: 14, color: Colors.black),
                     textAlign: TextAlign.center,
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 30),
+            // State 3 clock utilizing the compliant formula incorporating State 2 input
             LuxuryCircularClock(
               timeString: timeString,
-              northAngle: physicalNorthHeading,
+              northAngle: compliantNorthAngle,
             ),
           ],
         );

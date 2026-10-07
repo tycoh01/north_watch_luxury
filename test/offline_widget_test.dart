@@ -28,7 +28,7 @@ void main() {
       expect(find.text('Sun Intensity: 5'), findsOneWidget);
 
       // Verify Sun Vector UI
-      expect(find.textContaining('Sun Vector:'), findsOneWidget);
+      expect(find.textContaining('Sun Vector (Clock Unit:'), findsOneWidget);
 
       // Verify Offline Status
       expect(find.text('Status: Offline Mode'), findsOneWidget);
@@ -54,7 +54,7 @@ void main() {
       await tester.tap(find.text('2. Sun Input'));
       await tester.pumpAndSettle();
       expect(find.text('Sun Direction Input Mode'), findsOneWidget);
-      expect(find.text('Apply Sun Direction'), findsOneWidget);
+      expect(find.text('Apply Sun Clock Units'), findsOneWidget);
 
       // Tap State 3: Compass North
       await tester.tap(find.text('3. Compass North'));
