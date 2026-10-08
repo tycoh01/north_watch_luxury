@@ -40,6 +40,10 @@ android {
             initWith(getByName("debug"))
             applicationIdSuffix = ".north"
         }
+        create("south") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".south"
+        }
     }
 
     packaging {
