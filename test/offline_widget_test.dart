@@ -28,7 +28,7 @@ void main() {
       expect(find.text('Sun Intensity: 5'), findsOneWidget);
 
       // Verify Sun Vector UI
-      expect(find.textContaining('Sun Vector (Clock Unit:'), findsOneWidget);
+      expect(find.textContaining('Sun Vector (Asun:'), findsOneWidget);
 
       // Verify Offline Status
       expect(find.text('Status: Offline Mode'), findsOneWidget);
@@ -60,7 +60,7 @@ void main() {
       await tester.tap(find.text('3. Compass North'));
       await tester.pumpAndSettle();
       expect(find.text('Compass North Calibration Mode'), findsOneWidget);
-      expect(find.text('Physical Compass North: 90.0°'), findsOneWidget);
+      expect(find.textContaining('Calculated Corrected Anorth:'), findsOneWidget);
     });
   });
 }

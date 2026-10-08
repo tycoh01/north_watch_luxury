@@ -67,12 +67,16 @@ class _OfflineWidgetState extends State<OfflineWidget> {
   Widget build(BuildContext context) {
     final double physicalNorthHeading = _physicalNorth;
 
-    // State 2 sun direction in clock units mapped to azimuth (1 hour = 15°)
+    // State 2 sun direction in clock units mapped to azimuth A_sun (1 hour = 15°)
     final double sunAzimuth = _sunClockHours * 15.0;
     final double sunElevation = 90.0 - (((_currentTime.hour - 12).abs()) * 7.5);
 
-    // State 3 formula: north vector formula incorporating State 2 sun direction clock unit input
-    final double compliantNorthAngle = physicalNorthHeading + sunAzimuth;
+    // Hour hand angle H = 30 * (h + m/60)
+    final double hValue = (_currentTime.hour % 12) + (_currentTime.minute / 60.0) + (_currentTime.second / 3600.0);
+    final double H = 30.0 * hValue;
+
+    // CORRECTED SOLAR NAVIGATION FORMULA FOR NORTH: Anorth = (Asun - H/2) mod 360
+    final double northDirection = ((sunAzimuth - (H / 2.0)) % 360.0 + 360.0) % 360.0;
 
     // Format clock representation (HH:MM:SS)
     final String timeString =
@@ -109,7 +113,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
             child: Center(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
-                child: _buildCurrentStateView(timeString, physicalNorthHeading, sunAzimuth, sunElevation, compliantNorthAngle),
+                child: _buildCurrentStateView(timeString, physicalNorthHeading, sunAzimuth, sunElevation, northDirection, H),
               ),
             ),
           ),
@@ -139,7 +143,8 @@ class _OfflineWidgetState extends State<OfflineWidget> {
     double physicalNorthHeading,
     double sunAzimuth,
     double sunElevation,
-    double compliantNorthAngle,
+    double northDirection,
+    double H,
   ) {
     switch (_currentState) {
       case ClockState.clockAndSun:
@@ -151,14 +156,14 @@ class _OfflineWidgetState extends State<OfflineWidget> {
             Text('Sun Intensity: $offlineSun', style: const TextStyle(fontSize: 20)),
             const SizedBox(height: 10),
             Text(
-              'Sun Vector (Clock Unit: ${_sunClockHours.toStringAsFixed(1)}h): Azimuth ${sunAzimuth.toStringAsFixed(1)}°, Elev ${sunElevation.toStringAsFixed(1)}°',
+              'Sun Vector (Asun: ${sunAzimuth.toStringAsFixed(1)}°, H: ${H.toStringAsFixed(1)}°): Elev ${sunElevation.toStringAsFixed(1)}°',
               style: const TextStyle(fontSize: 14, color: Colors.amber, fontWeight: FontWeight.w600),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
             LuxuryCircularClock(
               timeString: timeString,
-              northAngle: physicalNorthHeading,
+              northAngle: northDirection,
             ),
             const SizedBox(height: 20),
             Text(offlineStatus, style: const TextStyle(color: Colors.red)),
@@ -226,7 +231,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
             ),
             const SizedBox(height: 30),
             Text(
-              'Active Sun Clock Units: ${_sunClockHours.toStringAsFixed(1)}h (Azimuth: ${sunAzimuth.toStringAsFixed(1)}°)',
+              'Active Sun Clock Units: ${_sunClockHours.toStringAsFixed(1)}h (Asun: ${sunAzimuth.toStringAsFixed(1)}°)',
               style: const TextStyle(fontSize: 18, color: Colors.amber),
               textAlign: TextAlign.center,
             ),
@@ -254,12 +259,12 @@ class _OfflineWidgetState extends State<OfflineWidget> {
                   const Icon(Icons.explore, size: 48, color: Colors.blueAccent),
                   const SizedBox(height: 10),
                   Text(
-                    'Physical Compass North: ${physicalNorthHeading.toStringAsFixed(1)}°',
+                    'Calculated Corrected Anorth: ${northDirection.toStringAsFixed(1)}°',
                     style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blue),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Compliant North Vector Formula:\nCompass Heading + (Sun Clock Units × 15°)\n= ${compliantNorthAngle.toStringAsFixed(1)}°',
+                    'Corrected Solar Navigation Formula:\nAnorth = (Asun - H/2) mod 360\n= (${sunAzimuth.toStringAsFixed(1)}° - ${(H / 2.0).toStringAsFixed(1)}°) mod 360\n= ${northDirection.toStringAsFixed(1)}°',
                     style: const TextStyle(fontSize: 14, color: Colors.black),
                     textAlign: TextAlign.center,
                   ),
@@ -267,10 +272,10 @@ class _OfflineWidgetState extends State<OfflineWidget> {
               ),
             ),
             const SizedBox(height: 30),
-            // State 3 clock utilizing the compliant formula incorporating State 2 input
+            // State 3 clock utilizing the corrected solar navigation formula
             LuxuryCircularClock(
               timeString: timeString,
-              northAngle: compliantNorthAngle,
+              northAngle: northDirection,
             ),
           ],
         );
