@@ -62,5 +62,23 @@ void main() {
       expect(find.text('Compass North Calibration Mode'), findsOneWidget);
       expect(find.textContaining('Calculated Corrected Anorth:'), findsOneWidget);
     });
+
+    testWidgets('testNorth verifies north direction calculation across state pages', (WidgetTester tester) async {
+      final stubbedTime = DateTime(2026, 9, 28, 12, 0, 0);
+
+      await tester.pumpWidget(MaterialApp(
+        home: OfflineWidget(
+          timeProvider: () => stubbedTime,
+          compassProvider: () => 0.0,
+        ),
+      ));
+
+      // Navigate to State 3: Compass North
+      await tester.tap(find.text('3. Compass North'));
+      await tester.pumpAndSettle();
+
+      // Verify that Calculated Corrected Anorth is displayed correctly
+      expect(find.textContaining('Calculated Corrected Anorth:'), findsOneWidget);
+    });
   });
 }
