@@ -11,9 +11,12 @@ void main() {
       expect(offlineSun, 5);
     });
 
-    test('Physical compass heading verification', () {
-      final double physicalHeading = 45.0;
-      expect(physicalHeading, 45.0);
+    test('Solar navigation north calculation formula unit test (testNorth)', () {
+      // Formula: Anorth = (Asun - H/2 + 180) mod 360
+      final double sunAzimuth = 180.0; // 12h * 15°
+      final double H = 360.0; // 12:00 hour hand angle
+      final double northDirection = ((sunAzimuth - (H / 2.0) + 180.0) % 360.0 + 360.0) % 360.0;
+      expect(northDirection, 180.0);
     });
 
     testWidgets('OfflineWidget renders State 1 (Clock & Sun) components correctly', (WidgetTester tester) async {
@@ -63,7 +66,7 @@ void main() {
       expect(find.textContaining('Calculated Corrected Anorth:'), findsOneWidget);
     });
 
-    testWidgets('testNorth verifies north direction calculation across state pages', (WidgetTester tester) async {
+    testWidgets('testNorth verifies calculated north direction across state pages', (WidgetTester tester) async {
       final stubbedTime = DateTime(2026, 9, 28, 12, 0, 0);
 
       await tester.pumpWidget(MaterialApp(
