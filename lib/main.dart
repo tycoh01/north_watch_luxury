@@ -43,7 +43,8 @@ class _OfflineWidgetState extends State<OfflineWidget> {
   StreamSubscription<MagnetometerEvent>? _magnetometerSubscription;
 
   DateTime get _now {
-    final raw = widget.timeProvider?.call() ?? DateTime.now();
+    final timeProv = widget.timeProvider;
+    final raw = timeProv != null ? timeProv() : DateTime.now();
     return raw.toUtc().add(const Duration(hours: 8));
   }
 
@@ -62,12 +63,10 @@ class _OfflineWidgetState extends State<OfflineWidget> {
     // Listen to physical magnetometer events with an input/output smoothing filter loop
     try {
       _magnetometerSubscription = magnetometerEvents.listen((MagnetometerEvent event) {
-        // Calculate raw heading from x and y magnetometer axes
         double rawHeading = math.atan2(event.y, event.x) * (180.0 / math.pi);
         if (rawHeading < 0) {
           rawHeading += 360.0;
         }
-        // Input/Output feedback loop with Exponential Moving Average (EMA) smoothing
         setState(() {
           _sensorHeading = (_sensorHeading * 0.8) + (rawHeading * 0.2);
         });
@@ -332,7 +331,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Live Sensor Compass North:', style: TextStyle(color: Colors.white70)),
+                      const Text('Live Sensor Compass North (Blue P):', style: TextStyle(color: Colors.white70)),
                       Text('${physicalNorthHeading.toStringAsFixed(1)}°', style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
                     ],
                   ),
@@ -340,7 +339,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Calculated Solar North:', style: TextStyle(color: Colors.white70)),
+                      const Text('Calculated Solar North (Red N):', style: TextStyle(color: Colors.white70)),
                       Text('${northDirection.toStringAsFixed(1)}°', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
                     ],
                   ),
@@ -356,9 +355,11 @@ class _OfflineWidgetState extends State<OfflineWidget> {
               ),
             ),
             const SizedBox(height: 25),
+            // State 4 clock rendering both Red (calculated north) and Blue (physical north) vectors simultaneously
             LuxuryCircularClock(
               timeString: timeString,
               northAngle: northDirection,
+              physicalNorthAngle: physicalNorthHeading,
             ),
           ],
         );
@@ -369,16 +370,21 @@ class _OfflineWidgetState extends State<OfflineWidget> {
 class LuxuryCircularClock extends StatelessWidget {
   final String timeString;
   final double northAngle;
+  final double? physicalNorthAngle;
 
   const LuxuryCircularClock({
     super.key,
     required this.timeString,
     required this.northAngle,
+    this.physicalNorthAngle,
   });
 
   @override
   Widget build(BuildContext context) {
     final double angleInRadians = northAngle * (3.141592653589793 / 180.0);
+    final double? physicalAngleInRadians = physicalNorthAngle != null
+        ? physicalNorthAngle! * (3.141592653589793 / 180.0)
+        : null;
 
     return Container(
       width: 220,
@@ -418,7 +424,7 @@ class LuxuryCircularClock extends StatelessWidget {
               ),
             );
           }),
-          // North Vector Transformed Indicator Needle
+          // Red Calculated North Vector Transformed Indicator Needle
           Transform.rotate(
             angle: angleInRadians,
             child: Stack(
@@ -450,6 +456,38 @@ class LuxuryCircularClock extends StatelessWidget {
               ],
             ),
           ),
+          // Blue Physical North Vector Transformed Indicator Needle (if provided in State 4)
+          if (physicalAngleInRadians != null)
+            Transform.rotate(
+              angle: physicalAngleInRadians,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Positioned(
+                    top: 20,
+                    child: Container(
+                      width: 3.5,
+                      height: 45,
+                      decoration: BoxDecoration(
+                        color: Colors.blueAccent,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const Positioned(
+                    top: 4,
+                    child: Text(
+                      'P',
+                      style: TextStyle(
+                        color: Colors.blueAccent,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           // Center Core & Luxury Digital Time Display
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),

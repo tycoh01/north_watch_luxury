@@ -12,27 +12,27 @@ void main() {
     });
 
     test('Solar navigation north calculation formula unit test (testNorth)', () {
-      final double sunAzimuth = 180.0;
-      final double H = 360.0;
-      final double northDirection = ((sunAzimuth - (H / 2.0) + 180.0) % 360.0 + 360.0) % 360.0;
+      const double sunAzimuth = 180.0;
+      const double H = 360.0;
+      const double northDirection = ((sunAzimuth - (H / 2.0) + 180.0) % 360.0 + 360.0) % 360.0;
       expect(northDirection, 180.0);
     });
 
     test('Solar navigation north calculation at same location with different times', () {
-      final double sunAzimuth = 180.0;
+      const double sunAzimuth = 180.0;
 
-      final double H_morning = 270.0;
-      final double north_morning = ((sunAzimuth - (H_morning / 2.0) + 180.0) % 360.0 + 360.0) % 360.0;
+      const double hMorning = 270.0;
+      const double northMorning = ((sunAzimuth - (hMorning / 2.0) + 180.0) % 360.0 + 360.0) % 360.0;
 
-      final double H_noon = 360.0;
-      final double north_noon = ((sunAzimuth - (H_noon / 2.0) + 180.0) % 360.0 + 360.0) % 360.0;
+      const double hNoon = 360.0;
+      const double northNoon = ((sunAzimuth - (hNoon / 2.0) + 180.0) % 360.0 + 360.0) % 360.0;
 
-      final double H_afternoon = 90.0;
-      final double north_afternoon = ((sunAzimuth - (H_afternoon / 2.0) + 180.0) % 360.0 + 360.0) % 360.0;
+      const double hAfternoon = 90.0;
+      const double northAfternoon = ((sunAzimuth - (hAfternoon / 2.0) + 180.0) % 360.0 + 360.0) % 360.0;
 
-      expect(north_morning, 225.0);
-      expect(north_noon, 180.0);
-      expect(north_afternoon, 315.0);
+      expect(northMorning, 225.0);
+      expect(northNoon, 180.0);
+      expect(northAfternoon, 315.0);
     });
 
     testWidgets('OfflineWidget renders State 1 (Clock & Sun) components correctly', (WidgetTester tester) async {
