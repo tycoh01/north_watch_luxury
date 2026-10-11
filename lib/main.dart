@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:sensors_plus/sensors_plus.dart';
 
 // Static offline variables
 const String appTitle = 'Offline Clock App';
@@ -36,14 +38,16 @@ class _OfflineWidgetState extends State<OfflineWidget> {
   double _sunClockHours = 12.0; // State 2: Sun direction represented in clock units (0 - 24 hours)
   final TextEditingController _sunController = TextEditingController(text: '12.0');
 
+  // Live physical sensor heading via sensors_plus
+  double _sensorHeading = 0.0;
+  StreamSubscription<MagnetometerEvent>? _magnetometerSubscription;
+
   DateTime get _now {
-    final raw = widget.timeProvider != null ? widget.timeProvider!() : DateTime.now();
+    final raw = widget.timeProvider?.call() ?? DateTime.now();
     return raw.toUtc().add(const Duration(hours: 8));
   }
 
-  double get _physicalNorth {
-    return widget.compassProvider != null ? widget.compassProvider!() : 0.0;
-  }
+  double get _physicalNorth => widget.compassProvider?.call() ?? _sensorHeading;
 
   @override
   void initState() {
@@ -54,12 +58,30 @@ class _OfflineWidgetState extends State<OfflineWidget> {
         _currentTime = _now;
       });
     });
+
+    // Listen to physical magnetometer events with an input/output smoothing filter loop
+    try {
+      _magnetometerSubscription = magnetometerEvents.listen((MagnetometerEvent event) {
+        // Calculate raw heading from x and y magnetometer axes
+        double rawHeading = math.atan2(event.y, event.x) * (180.0 / math.pi);
+        if (rawHeading < 0) {
+          rawHeading += 360.0;
+        }
+        // Input/Output feedback loop with Exponential Moving Average (EMA) smoothing
+        setState(() {
+          _sensorHeading = (_sensorHeading * 0.8) + (rawHeading * 0.2);
+        });
+      });
+    } catch (_) {
+      // Fallback if sensors are not supported on current platform (e.g. desktop/tests)
+    }
   }
 
   @override
   void dispose() {
     _timer.cancel();
     _sunController.dispose();
+    _magnetometerSubscription?.cancel();
     super.dispose();
   }
 
@@ -266,7 +288,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
                   const Icon(Icons.explore, size: 48, color: Colors.blueAccent),
                   const SizedBox(height: 10),
                   Text(
-                    'Calculated Corrected Anorth: ${northDirection.toStringAsFixed(1)}°',
+                    'Live Physical Compass North: ${physicalNorthHeading.toStringAsFixed(1)}°',
                     style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blue),
                   ),
                   const SizedBox(height: 8),
@@ -310,7 +332,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Physical Compass North:', style: TextStyle(color: Colors.white70)),
+                      const Text('Live Sensor Compass North:', style: TextStyle(color: Colors.white70)),
                       Text('${physicalNorthHeading.toStringAsFixed(1)}°', style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
                     ],
                   ),
