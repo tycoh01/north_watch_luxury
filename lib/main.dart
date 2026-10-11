@@ -63,7 +63,8 @@ class _OfflineWidgetState extends State<OfflineWidget> {
     // Listen to physical magnetometer events with an input/output smoothing filter loop
     try {
       _magnetometerSubscription = magnetometerEvents.listen((MagnetometerEvent event) {
-        double rawHeading = math.atan2(event.y, event.x) * (180.0 / math.pi);
+        // Calculate raw heading with +180° inversion correction matching inference
+        double rawHeading = (math.atan2(event.y, event.x) * (180.0 / math.pi) + 180.0) % 360.0;
         if (rawHeading < 0) {
           rawHeading += 360.0;
         }
