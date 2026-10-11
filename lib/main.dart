@@ -11,7 +11,7 @@ void main() => runApp(const MaterialApp(
       home: OfflineWidget(),
     ));
 
-enum ClockState { clockAndSun, sunInput, compassNorth }
+enum ClockState { clockAndSun, sunInput, compassNorth, comparison }
 
 class OfflineWidget extends StatefulWidget {
   final DateTime Function()? timeProvider;
@@ -31,7 +31,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
   late Timer _timer;
   late DateTime _currentTime;
   
-  // Three states management
+  // Four states management
   ClockState _currentState = ClockState.clockAndSun;
   double _sunClockHours = 12.0; // State 2: Sun direction represented in clock units (0 - 24 hours)
   final TextEditingController _sunController = TextEditingController(text: '12.0');
@@ -75,7 +75,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
     final double hValue = (_currentTime.hour % 12) + (_currentTime.minute / 60.0) + (_currentTime.second / 3600.0);
     final double H = 30.0 * hValue;
 
-    // CORRECTED SOLAR NAVIGATION FORMULA FOR NORTH: Anorth = (Asun - H/2) mod 360
+    // EXACT SOLAR NAVIGATION FORMULA FOR NORTH: Anorth = (Asun - H/2 + 180) mod 360
     final double northDirection = ((sunAzimuth - (H / 2.0)) % 360.0 + 360.0) % 360.0;
 
     // Format clock representation (HH:MM:SS)
@@ -96,17 +96,24 @@ class _OfflineWidgetState extends State<OfflineWidget> {
       ),
       body: Column(
         children: [
-          // State Selector Bar (Three States)
+          // State Selector Bar (Four States)
           Container(
             color: Colors.grey[900],
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildStateButton('1. Clock & Sun', ClockState.clockAndSun),
-                _buildStateButton('2. Sun Input', ClockState.sunInput),
-                _buildStateButton('3. Compass North', ClockState.compassNorth),
-              ],
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildStateButton('1. Clock & Sun', ClockState.clockAndSun),
+                  const SizedBox(width: 6),
+                  _buildStateButton('2. Sun Input', ClockState.sunInput),
+                  const SizedBox(width: 6),
+                  _buildStateButton('3. Compass North', ClockState.compassNorth),
+                  const SizedBox(width: 6),
+                  _buildStateButton('4. North Compare', ClockState.comparison),
+                ],
+              ),
             ),
           ),
           Expanded(
@@ -134,7 +141,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
           _currentState = state;
         });
       },
-      child: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+      child: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
     );
   }
 
@@ -264,7 +271,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Corrected Solar Navigation Formula:\nAnorth = (Asun - H/2) mod 360\n= (${sunAzimuth.toStringAsFixed(1)}° - ${(H / 2.0).toStringAsFixed(1)}°) mod 360\n= ${northDirection.toStringAsFixed(1)}°',
+                    'Solar Navigation Formula:\nAnorth = (Asun - H/2 + 180) mod 360\n= (${sunAzimuth.toStringAsFixed(1)}° - ${(H / 2.0).toStringAsFixed(1)}° + 180°) mod 360\n= ${northDirection.toStringAsFixed(1)}°',
                     style: const TextStyle(fontSize: 14, color: Colors.black),
                     textAlign: TextAlign.center,
                   ),
@@ -272,7 +279,61 @@ class _OfflineWidgetState extends State<OfflineWidget> {
               ),
             ),
             const SizedBox(height: 30),
-            // State 3 clock utilizing the corrected solar navigation formula
+            // State 3 clock utilizing the solar navigation formula
+            LuxuryCircularClock(
+              timeString: timeString,
+              northAngle: northDirection,
+            ),
+          ],
+        );
+
+      case ClockState.comparison:
+        final double deltaNorth = (physicalNorthHeading - northDirection).abs();
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'Physical vs. Calculated North Comparison',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFFD4AF37)),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[900],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFD4AF37), width: 2),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Physical Compass North:', style: TextStyle(color: Colors.white70)),
+                      Text('${physicalNorthHeading.toStringAsFixed(1)}°', style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const Divider(color: Colors.grey),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Calculated Solar North:', style: TextStyle(color: Colors.white70)),
+                      Text('${northDirection.toStringAsFixed(1)}°', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const Divider(color: Colors.grey),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Variance / Delta:', style: TextStyle(color: Colors.white70)),
+                      Text('${deltaNorth.toStringAsFixed(1)}°', style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 25),
             LuxuryCircularClock(
               timeString: timeString,
               northAngle: northDirection,
