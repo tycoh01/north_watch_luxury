@@ -182,7 +182,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
           children: [
             const Icon(Icons.wb_sunny, size: 64, color: Colors.amber),
             const SizedBox(height: 10),
-            Text('Sun Intensity: $offlineSun', style: const TextStyle(fontSize: 20)),
+            const Text('Sun Intensity: $offlineSun', style: TextStyle(fontSize: 20)),
             const SizedBox(height: 10),
             Text(
               'Sun Vector (Asun: ${sunAzimuth.toStringAsFixed(1)}°, H: ${H.toStringAsFixed(1)}°): Elev ${sunElevation.toStringAsFixed(1)}°',
@@ -195,7 +195,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
               northAngle: northDirection,
             ),
             const SizedBox(height: 20),
-            Text(offlineStatus, style: const TextStyle(color: Colors.red)),
+            const Text(offlineStatus, style: TextStyle(color: Colors.red)),
             const SizedBox(height: 10),
             const Text('App Version: $appVersion', style: TextStyle(color: Colors.grey)),
           ],
