@@ -295,7 +295,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Watch Dial Method:\nAsouth = Asun - H/2 = ${southDirection.toStringAsFixed(1)}°\nAnorth = Asouth + 180 = ${northDirection.toStringAsFixed(1)}°',
+                    'Watch Dial Method (Sun Azimuth tracking):\nAsouth = Asun - H/2 = ${southDirection.toStringAsFixed(1)}°\nAnorth = Asouth + 180 = ${northDirection.toStringAsFixed(1)}°',
                     style: const TextStyle(fontSize: 14, color: Colors.black),
                     textAlign: TextAlign.center,
                   ),
@@ -303,9 +303,11 @@ class _OfflineWidgetState extends State<OfflineWidget> {
               ),
             ),
             const SizedBox(height: 30),
+            // State 3 clock with dial rotating smoothly to follow sun direction (sunAzimuth)
             LuxuryCircularClock(
               timeString: timeString,
               northAngle: northDirection,
+              sunAzimuth: sunAzimuth,
             ),
           ],
         );
@@ -395,11 +397,12 @@ class _OfflineWidgetState extends State<OfflineWidget> {
               ),
             ),
             const SizedBox(height: 20),
-            // State 4 clock rendering both Red (calculated north) and Blue (physical north) vectors simultaneously
+            // State 4 clock rendering dual vectors and dial rotating smoothly to follow sun direction (sunAzimuth)
             LuxuryCircularClock(
               timeString: timeString,
               northAngle: northDirection,
               physicalNorthAngle: physicalNorthHeading,
+              sunAzimuth: sunAzimuth,
             ),
           ],
         );
@@ -411,12 +414,14 @@ class LuxuryCircularClock extends StatelessWidget {
   final String timeString;
   final double northAngle;
   final double? physicalNorthAngle;
+  final double? sunAzimuth;
 
   const LuxuryCircularClock({
     super.key,
     required this.timeString,
     required this.northAngle,
     this.physicalNorthAngle,
+    this.sunAzimuth,
   });
 
   @override
@@ -425,6 +430,9 @@ class LuxuryCircularClock extends StatelessWidget {
     final double? physicalAngleInRadians = physicalNorthAngle != null
         ? physicalNorthAngle! * (3.141592653589793 / 180.0)
         : null;
+    final double dialRotationRadians = sunAzimuth != null
+        ? sunAzimuth! * (3.141592653589793 / 180.0)
+        : 0.0;
 
     return Container(
       width: 220,
@@ -450,20 +458,60 @@ class LuxuryCircularClock extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          ...List.generate(12, (index) {
-            final angle = index * (3.141592653589793 / 6);
-            return Transform.rotate(
-              angle: angle,
-              child: Align(
-                alignment: Alignment.topCenter,
-                child: Container(
-                  width: index % 3 == 0 ? 3 : 1.5,
-                  height: index % 3 == 0 ? 12 : 8,
-                  color: const Color(0xFFD4AF37),
+          // Dynamic low-speed clock face rotation following sun direction with number marks (1-12)
+          TweenAnimationBuilder<double>(
+            tween: Tween<double>(begin: dialRotationRadians, end: dialRotationRadians),
+            duration: const Duration(milliseconds: 800),
+            curve: Curves.easeInOut,
+            builder: (context, animatedRotation, child) {
+              return Transform.rotate(
+                angle: animatedRotation,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    ...List.generate(12, (index) {
+                      final angle = index * (math.pi / 6);
+                      return Transform.rotate(
+                        angle: angle,
+                        child: Align(
+                          alignment: Alignment.topCenter,
+                          child: Container(
+                            width: index % 3 == 0 ? 3 : 1.5,
+                            height: index % 3 == 0 ? 12 : 8,
+                            color: const Color(0xFFD4AF37),
+                          ),
+                        ),
+                      );
+                    }),
+                    ...List.generate(12, (index) {
+                      final hourNum = index == 0 ? 12 : index;
+                      final angle = index * (math.pi / 6);
+                      return Transform.rotate(
+                        angle: angle,
+                        child: Align(
+                          alignment: Alignment.topCenter,
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 14.0),
+                            child: Transform.rotate(
+                              angle: -angle,
+                              child: Text(
+                                '$hourNum',
+                                style: const TextStyle(
+                                  color: Color(0xFFD4AF37),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
                 ),
-              ),
-            );
-          }),
+              );
+            },
+          ),
           // Red Calculated North Vector Transformed Indicator Needle
           Transform.rotate(
             angle: angleInRadians,
