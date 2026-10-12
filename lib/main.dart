@@ -43,8 +43,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
   StreamSubscription<MagnetometerEvent>? _magnetometerSubscription;
 
   DateTime get _now {
-    final timeProv = widget.timeProvider;
-    final raw = timeProv != null ? timeProv() : DateTime.now();
+    final raw = widget.timeProvider?.call() ?? DateTime.now();
     return raw.toUtc().add(const Duration(hours: 8));
   }
 
@@ -63,7 +62,6 @@ class _OfflineWidgetState extends State<OfflineWidget> {
     // Listen to physical magnetometer events with an input/output smoothing filter loop
     try {
       _magnetometerSubscription = magnetometerEvents.listen((MagnetometerEvent event) {
-        // Calculate raw heading with +180° inversion correction matching inference
         double rawHeading = (math.atan2(event.y, event.x) * (180.0 / math.pi) + 180.0) % 360.0;
         if (rawHeading < 0) {
           rawHeading += 360.0;
@@ -97,8 +95,11 @@ class _OfflineWidgetState extends State<OfflineWidget> {
     final double hValue = (_currentTime.hour % 12) + (_currentTime.minute / 60.0) + (_currentTime.second / 3600.0);
     final double H = 30.0 * hValue;
 
-    // EXACT SOLAR NAVIGATION FORMULA FOR NORTH: Anorth = (Asun - H/2 + 180) mod 360
-    final double northDirection = ((sunAzimuth - (H / 2.0)) % 360.0 + 360.0) % 360.0;
+    // WATCH DIAL METHOD FORMULAS:
+    // South is halfway between hour hand H and 12 o'clock (0°) -> Asouth = (Asun - H/2) mod 360
+    final double southDirection = ((sunAzimuth - (H / 2.0)) % 360.0 + 360.0) % 360.0;
+    // North is the opposite direction of South -> Anorth = (Asouth + 180) mod 360
+    final double northDirection = ((southDirection + 180.0) % 360.0 + 360.0) % 360.0;
 
     // Format clock representation (HH:MM:SS)
     final String timeString =
@@ -142,7 +143,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
             child: Center(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
-                child: _buildCurrentStateView(timeString, physicalNorthHeading, sunAzimuth, sunElevation, northDirection, H),
+                child: _buildCurrentStateView(timeString, physicalNorthHeading, sunAzimuth, sunElevation, northDirection, southDirection, H),
               ),
             ),
           ),
@@ -173,6 +174,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
     double sunAzimuth,
     double sunElevation,
     double northDirection,
+    double southDirection,
     double H,
   ) {
     switch (_currentState) {
@@ -182,7 +184,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
           children: [
             const Icon(Icons.wb_sunny, size: 64, color: Colors.amber),
             const SizedBox(height: 10),
-            const Text('Sun Intensity: $offlineSun', style: TextStyle(fontSize: 20)),
+            Text('Sun Intensity: $offlineSun', style: const TextStyle(fontSize: 20)),
             const SizedBox(height: 10),
             Text(
               'Sun Vector (Asun: ${sunAzimuth.toStringAsFixed(1)}°, H: ${H.toStringAsFixed(1)}°): Elev ${sunElevation.toStringAsFixed(1)}°',
@@ -195,7 +197,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
               northAngle: northDirection,
             ),
             const SizedBox(height: 20),
-            const Text(offlineStatus, style: TextStyle(color: Colors.red)),
+            Text(offlineStatus, style: const TextStyle(color: Colors.red)),
             const SizedBox(height: 10),
             const Text('App Version: $appVersion', style: TextStyle(color: Colors.grey)),
           ],
@@ -293,7 +295,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Solar Navigation Formula:\nAnorth = (Asun - H/2 + 180) mod 360\n= (${sunAzimuth.toStringAsFixed(1)}° - ${(H / 2.0).toStringAsFixed(1)}° + 180°) mod 360\n= ${northDirection.toStringAsFixed(1)}°',
+                    'Watch Dial Method:\nAsouth = Asun - H/2 = ${southDirection.toStringAsFixed(1)}°\nAnorth = Asouth + 180 = ${northDirection.toStringAsFixed(1)}°',
                     style: const TextStyle(fontSize: 14, color: Colors.black),
                     textAlign: TextAlign.center,
                   ),
@@ -301,7 +303,6 @@ class _OfflineWidgetState extends State<OfflineWidget> {
               ),
             ),
             const SizedBox(height: 30),
-            // State 3 clock utilizing the solar navigation formula
             LuxuryCircularClock(
               timeString: timeString,
               northAngle: northDirection,
@@ -315,11 +316,11 @@ class _OfflineWidgetState extends State<OfflineWidget> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Text(
-              'Physical vs. Calculated North Comparison',
+              'Watch Dial Method: North Compare',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFFD4AF37)),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 15),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -340,7 +341,15 @@ class _OfflineWidgetState extends State<OfflineWidget> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Calculated Solar North (Red N):', style: TextStyle(color: Colors.white70)),
+                      const Text('Watch Dial South (Asun - H/2):', style: TextStyle(color: Colors.white70)),
+                      Text('${southDirection.toStringAsFixed(1)}°', style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const Divider(color: Colors.grey),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Watch Dial North (Red N):', style: TextStyle(color: Colors.white70)),
                       Text('${northDirection.toStringAsFixed(1)}°', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
                     ],
                   ),
@@ -355,7 +364,37 @@ class _OfflineWidgetState extends State<OfflineWidget> {
                 ],
               ),
             ),
-            const SizedBox(height: 25),
+            const SizedBox(height: 15),
+            // Error Warning Card based on watch dial accuracy limitations
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red[900]?.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.redAccent, width: 1.5),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Accuracy Limitations & Error Warning',
+                        style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 6),
+                  Text(
+                    '• Local Time vs. Zone Time discrepancy\n• Equation of Time (Solar time vs. Mean solar time)\n• Non-uniform change of Sun azimuth near tropics',
+                    style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
             // State 4 clock rendering both Red (calculated north) and Blue (physical north) vectors simultaneously
             LuxuryCircularClock(
               timeString: timeString,
