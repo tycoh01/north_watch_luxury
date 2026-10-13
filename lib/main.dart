@@ -13,6 +13,43 @@ void main() => runApp(const MaterialApp(
       home: OfflineWidget(),
     ));
 
+/// Mathematical Object: SunDialRing inheriting/implementing Iterable<int>
+/// modeling the finite cyclic group (Z/12Z) for sun dial numbers rotation.
+class SunDialRing extends Iterable<int> {
+  final int modulus;
+  final int currentOffset;
+
+  const SunDialRing({this.modulus = 12, this.currentOffset = 0});
+
+  @override
+  Iterator<int> get iterator => _SunDialIterator(modulus, currentOffset);
+
+  SunDialRing rotate(int steps) {
+    final newOffset = (currentOffset + steps) % modulus;
+    return SunDialRing(
+      modulus: modulus,
+      currentOffset: newOffset < 0 ? newOffset + modulus : newOffset,
+    );
+  }
+}
+
+class _SunDialIterator implements Iterator<int> {
+  final int modulus;
+  final int offset;
+  int _currentIndex = -1;
+
+  _SunDialIterator(this.modulus, this.offset);
+
+  @override
+  int get current => ((_currentIndex + offset) % modulus) + 1; // 1 to 12
+
+  @override
+  bool moveNext() {
+    _currentIndex++;
+    return _currentIndex < modulus;
+  }
+}
+
 enum ClockState { clockAndSun, sunInput, compassNorth, comparison }
 
 class OfflineWidget extends StatefulWidget {
@@ -89,6 +126,8 @@ class _OfflineWidgetState extends State<OfflineWidget> {
 
     // State 2 sun direction in clock units mapped to azimuth A_sun (1 hour = 15°)
     final double sunAzimuth = _sunClockHours * 15.0;
+    // Clock face dial rotation angle corresponding to sun clock input (30° per clock hour on 12-hour dial)
+    final double sunClockDialAngle = _sunClockHours * 30.0;
     final double sunElevation = 90.0 - (((_currentTime.hour - 12).abs()) * 7.5);
 
     // Hour hand angle H = 30 * (h + m/60)
@@ -143,7 +182,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
             child: Center(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
-                child: _buildCurrentStateView(timeString, physicalNorthHeading, sunAzimuth, sunElevation, northDirection, southDirection, H),
+                child: _buildCurrentStateView(timeString, physicalNorthHeading, sunAzimuth, sunClockDialAngle, sunElevation, northDirection, southDirection, H),
               ),
             ),
           ),
@@ -172,6 +211,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
     String timeString,
     double physicalNorthHeading,
     double sunAzimuth,
+    double sunClockDialAngle,
     double sunElevation,
     double northDirection,
     double southDirection,
@@ -213,7 +253,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
             ),
             const SizedBox(height: 20),
             const Text(
-              'Enter sun direction in clock units (Solar Hours 0.0 - 24.0h):\n(1 hour = 15° Azimuth)',
+              'Enter sun direction in clock units (Solar Hours 0.0 - 24.0h):\n(1 hour = 30° Clock Dial / 15° Azimuth)',
               style: TextStyle(fontSize: 16, color: Colors.black),
               textAlign: TextAlign.center,
             ),
@@ -262,7 +302,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
             ),
             const SizedBox(height: 30),
             Text(
-              'Active Sun Clock Units: ${_sunClockHours.toStringAsFixed(1)}h (Asun: ${sunAzimuth.toStringAsFixed(1)}°)',
+              'Active Sun Clock Units: ${_sunClockHours.toStringAsFixed(1)}h (Dial Angle: ${sunClockDialAngle.toStringAsFixed(1)}°)',
               style: const TextStyle(fontSize: 18, color: Colors.amber),
               textAlign: TextAlign.center,
             ),
@@ -295,7 +335,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Watch Dial Method (Sun Azimuth tracking):\nAsouth = Asun - H/2 = ${southDirection.toStringAsFixed(1)}°\nAnorth = Asouth + 180 = ${northDirection.toStringAsFixed(1)}°',
+                    'Watch Dial Method (12 o\'clock aligned with sun clock input ${_sunClockHours.toStringAsFixed(1)}h):\nAsouth = Asun - H/2 = ${southDirection.toStringAsFixed(1)}°\nAnorth = Asouth + 180 = ${northDirection.toStringAsFixed(1)}°',
                     style: const TextStyle(fontSize: 14, color: Colors.black),
                     textAlign: TextAlign.center,
                   ),
@@ -303,11 +343,11 @@ class _OfflineWidgetState extends State<OfflineWidget> {
               ),
             ),
             const SizedBox(height: 30),
-            // State 3 clock with dial rotating smoothly to follow sun direction (sunAzimuth)
+            // State 3 clock with dial rotating smoothly so 12 o'clock aligns with sun clock input (sunClockDialAngle)
             LuxuryCircularClock(
               timeString: timeString,
               northAngle: northDirection,
-              sunAzimuth: sunAzimuth,
+              sunAzimuth: sunClockDialAngle,
             ),
           ],
         );
@@ -397,12 +437,12 @@ class _OfflineWidgetState extends State<OfflineWidget> {
               ),
             ),
             const SizedBox(height: 20),
-            // State 4 clock rendering dual vectors and dial rotating smoothly to follow sun direction (sunAzimuth)
+            // State 4 clock rendering dual vectors and 12 o'clock aligned with sun clock input (sunClockDialAngle)
             LuxuryCircularClock(
               timeString: timeString,
               northAngle: northDirection,
               physicalNorthAngle: physicalNorthHeading,
-              sunAzimuth: sunAzimuth,
+              sunAzimuth: sunClockDialAngle,
             ),
           ],
         );
@@ -434,6 +474,10 @@ class LuxuryCircularClock extends StatelessWidget {
         ? sunAzimuth! * (3.141592653589793 / 180.0)
         : 0.0;
 
+    // Instantiate SunDialRing mathematical object (Iterable<int> Z/12Z)
+    final SunDialRing dialRing = const SunDialRing(modulus: 12);
+    final List<int> hours = dialRing.toList();
+
     return Container(
       width: 220,
       height: 220,
@@ -458,7 +502,7 @@ class LuxuryCircularClock extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Dynamic low-speed clock face rotation following sun direction with number marks (1-12)
+          // Dynamic low-speed clock face rotation using SunDialRing aligned with sun clock input
           TweenAnimationBuilder<double>(
             tween: Tween<double>(begin: dialRotationRadians, end: dialRotationRadians),
             duration: const Duration(milliseconds: 800),
@@ -469,22 +513,23 @@ class LuxuryCircularClock extends StatelessWidget {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    ...List.generate(12, (index) {
+                    ...hours.map((hour) {
+                      final index = hour == 12 ? 0 : hour;
                       final angle = index * (math.pi / 6);
                       return Transform.rotate(
                         angle: angle,
                         child: Align(
                           alignment: Alignment.topCenter,
                           child: Container(
-                            width: index % 3 == 0 ? 3 : 1.5,
-                            height: index % 3 == 0 ? 12 : 8,
+                            width: hour % 3 == 0 ? 3 : 1.5,
+                            height: hour % 3 == 0 ? 12 : 8,
                             color: const Color(0xFFD4AF37),
                           ),
                         ),
                       );
                     }),
-                    ...List.generate(12, (index) {
-                      final hourNum = index == 0 ? 12 : index;
+                    ...hours.map((hour) {
+                      final index = hour == 12 ? 0 : hour;
                       final angle = index * (math.pi / 6);
                       return Transform.rotate(
                         angle: angle,
@@ -495,7 +540,7 @@ class LuxuryCircularClock extends StatelessWidget {
                             child: Transform.rotate(
                               angle: -angle,
                               child: Text(
-                                '$hourNum',
+                                '$hour',
                                 style: const TextStyle(
                                   color: Color(0xFFD4AF37),
                                   fontSize: 10,
