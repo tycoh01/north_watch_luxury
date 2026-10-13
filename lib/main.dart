@@ -335,7 +335,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Watch Dial Method (12 o\'clock aligned with sun clock input ${_sunClockHours.toStringAsFixed(1)}h):\nAsouth = Asun - H/2 = ${southDirection.toStringAsFixed(1)}°\nAnorth = Asouth + 180 = ${northDirection.toStringAsFixed(1)}°',
+                    'Watch Dial Method (Cinematic sun alignment ${_sunClockHours.toStringAsFixed(1)}h):\nAsouth = Asun - H/2 = ${southDirection.toStringAsFixed(1)}°\nAnorth = Asouth + 180 = ${northDirection.toStringAsFixed(1)}°',
                     style: const TextStyle(fontSize: 14, color: Colors.black),
                     textAlign: TextAlign.center,
                   ),
@@ -343,7 +343,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
               ),
             ),
             const SizedBox(height: 30),
-            // State 3 clock with dial rotating smoothly so 12 o'clock aligns with sun clock input (sunClockDialAngle)
+            // State 3 clock with cinematic 3D tilt/pan, golden sunlight, and sun clock dial alignment
             LuxuryCircularClock(
               timeString: timeString,
               northAngle: northDirection,
@@ -437,7 +437,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
               ),
             ),
             const SizedBox(height: 20),
-            // State 4 clock rendering dual vectors and 12 o'clock aligned with sun clock input (sunClockDialAngle)
+            // State 4 clock with cinematic 3D tilt/pan, golden sunlight, dual vectors, and sun clock dial alignment
             LuxuryCircularClock(
               timeString: timeString,
               northAngle: northDirection,
@@ -450,7 +450,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
   }
 }
 
-class LuxuryCircularClock extends StatelessWidget {
+class LuxuryCircularClock extends StatefulWidget {
   final String timeString;
   final double northAngle;
   final double? physicalNorthAngle;
@@ -465,194 +465,252 @@ class LuxuryCircularClock extends StatelessWidget {
   });
 
   @override
+  State<LuxuryCircularClock> createState() => _LuxuryCircularClockState();
+}
+
+class _LuxuryCircularClockState extends State<LuxuryCircularClock> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000), // 2 seconds cinematic transition
+    );
+    _anim = CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic);
+    if (widget.sunAzimuth != null) {
+      _controller.forward();
+    } else {
+      _controller.value = 1.0;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant LuxuryCircularClock oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.sunAzimuth != oldWidget.sunAzimuth && widget.sunAzimuth != null) {
+      _controller.forward(from: 0.0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final double angleInRadians = northAngle * (3.141592653589793 / 180.0);
-    final double? physicalAngleInRadians = physicalNorthAngle != null
-        ? physicalNorthAngle! * (3.141592653589793 / 180.0)
-        : null;
-    final double dialRotationRadians = sunAzimuth != null
-        ? sunAzimuth! * (3.141592653589793 / 180.0)
+    final double targetDialRotation = widget.sunAzimuth != null
+        ? widget.sunAzimuth! * (math.pi / 180.0)
         : 0.0;
 
-    // Instantiate SunDialRing mathematical object (Iterable<int> Z/12Z)
-    final SunDialRing dialRing = const SunDialRing(modulus: 12);
-    final List<int> hours = dialRing.toList();
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (context, child) {
+        final double progress = _anim.value;
+        // Cinematic 3D tilt & pan
+        final double tilt = (1.0 - progress) * 0.35;
+        final double pan = (1.0 - progress) * 0.2;
+        final double currentDialRotation = progress * targetDialRotation;
 
-    return Container(
-      width: 220,
-      height: 220,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const RadialGradient(
-          colors: [Color(0xFF2C2C2E), Color(0xFF1C1C1E), Color(0xFF000000)],
-          stops: [0.2, 0.7, 1.0],
-        ),
-        border: Border.all(
-          color: const Color(0xFFD4AF37),
-          width: 4,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.6),
-            blurRadius: 15,
-            spreadRadius: 5,
-          ),
-        ],
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Dynamic low-speed clock face rotation using SunDialRing aligned with sun clock input
-          TweenAnimationBuilder<double>(
-            tween: Tween<double>(begin: dialRotationRadians, end: dialRotationRadians),
-            duration: const Duration(milliseconds: 800),
-            curve: Curves.easeInOut,
-            builder: (context, animatedRotation, child) {
-              return Transform.rotate(
-                angle: animatedRotation,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    ...hours.map((hour) {
-                      final index = hour == 12 ? 0 : hour;
-                      final angle = index * (math.pi / 6);
-                      return Transform.rotate(
-                        angle: angle,
-                        child: Align(
-                          alignment: Alignment.topCenter,
-                          child: Container(
-                            width: hour % 3 == 0 ? 3 : 1.5,
-                            height: hour % 3 == 0 ? 12 : 8,
-                            color: const Color(0xFFD4AF37),
+        final double angleInRadians = widget.northAngle * (math.pi / 180.0);
+        final double? physicalAngleInRadians = widget.physicalNorthAngle != null
+            ? widget.physicalNorthAngle! * (math.pi / 180.0)
+            : null;
+
+        // Instantiate SunDialRing mathematical object (Iterable<int> Z/12Z)
+        final SunDialRing dialRing = const SunDialRing(modulus: 12);
+        final List<int> hours = dialRing.toList();
+
+        return Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.identity()
+            ..setEntry(3, 2, 0.001)
+            ..rotateX(tilt)
+            ..rotateY(pan),
+          child: Container(
+            width: 220,
+            height: 220,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  Color.lerp(const Color(0xFF3C3C3E), const Color(0xFF4C3C1E), progress)!,
+                  Color.lerp(const Color(0xFF1C1C1E), const Color(0xFF2C1E0A), progress)!,
+                  Color.lerp(const Color(0xFF000000), const Color(0xFF140C02), progress)!,
+                ],
+                stops: const [0.2, 0.7, 1.0],
+              ),
+              border: Border.all(
+                color: Color.lerp(const Color(0xFFD4AF37), const Color(0xFFFFD700), progress)!,
+                width: 4,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.amber.withValues(alpha: 0.3 * progress),
+                  blurRadius: 25 * progress + 10,
+                  spreadRadius: 8 * progress + 3,
+                ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  blurRadius: 15,
+                  spreadRadius: 5,
+                ),
+              ],
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Cinematic rotating clock dial using SunDialRing approaching sun direction
+                Transform.rotate(
+                  angle: currentDialRotation,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      ...hours.map((hour) {
+                        final index = hour == 12 ? 0 : hour;
+                        final angle = index * (math.pi / 6);
+                        return Transform.rotate(
+                          angle: angle,
+                          child: Align(
+                            alignment: Alignment.topCenter,
+                            child: Container(
+                              width: hour % 3 == 0 ? 3 : 1.5,
+                              height: hour % 3 == 0 ? 12 : 8,
+                              color: Color.lerp(const Color(0xFFD4AF37), const Color(0xFFFFE082), progress),
+                            ),
                           ),
-                        ),
-                      );
-                    }),
-                    ...hours.map((hour) {
-                      final index = hour == 12 ? 0 : hour;
-                      final angle = index * (math.pi / 6);
-                      return Transform.rotate(
-                        angle: angle,
-                        child: Align(
-                          alignment: Alignment.topCenter,
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 14.0),
-                            child: Transform.rotate(
-                              angle: -angle,
-                              child: Text(
-                                '$hour',
-                                style: const TextStyle(
-                                  color: Color(0xFFD4AF37),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
+                        );
+                      }),
+                      ...hours.map((hour) {
+                        final index = hour == 12 ? 0 : hour;
+                        final angle = index * (math.pi / 6);
+                        return Transform.rotate(
+                          angle: angle,
+                          child: Align(
+                            alignment: Alignment.topCenter,
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 14.0),
+                              child: Transform.rotate(
+                                angle: -angle,
+                                child: Text(
+                                  '$hour',
+                                  style: TextStyle(
+                                    color: Color.lerp(const Color(0xFFD4AF37), const Color(0xFFFFE082), progress),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+                // Red Calculated North Vector Transformed Indicator Needle
+                Transform.rotate(
+                  angle: angleInRadians,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Positioned(
+                        top: 15,
+                        child: Container(
+                          width: 4,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
                         ),
-                      );
-                    }),
-                  ],
-                ),
-              );
-            },
-          ),
-          // Red Calculated North Vector Transformed Indicator Needle
-          Transform.rotate(
-            angle: angleInRadians,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Positioned(
-                  top: 15,
-                  child: Container(
-                    width: 4,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: Colors.redAccent,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                // North 'N' marker
-                const Positioned(
-                  top: 2,
-                  child: Text(
-                    'N',
-                    style: TextStyle(
-                      color: Colors.redAccent,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Blue Physical North Vector Transformed Indicator Needle (if provided in State 4)
-          if (physicalAngleInRadians != null)
-            Transform.rotate(
-              angle: physicalAngleInRadians,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Positioned(
-                    top: 20,
-                    child: Container(
-                      width: 3.5,
-                      height: 45,
-                      decoration: BoxDecoration(
-                        color: Colors.blueAccent,
-                        borderRadius: BorderRadius.circular(2),
                       ),
-                    ),
-                  ),
-                  const Positioned(
-                    top: 4,
-                    child: Text(
-                      'P',
-                      style: TextStyle(
-                        color: Colors.blueAccent,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
+                      // North 'N' marker
+                      const Positioned(
+                        top: 2,
+                        child: Text(
+                          'N',
+                          style: TextStyle(
+                            color: Colors.redAccent,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          // Center Core & Luxury Digital Time Display
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.75),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.5), width: 1),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'LUXURY',
-                  style: TextStyle(
-                    color: Color(0xFFD4AF37),
-                    fontSize: 10,
-                    letterSpacing: 2.5,
-                    fontWeight: FontWeight.bold,
+                    ],
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  timeString,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'monospace',
-                    color: Colors.white,
-                    shadows: [
-                      Shadow(
-                        color: Color(0xFFD4AF37),
-                        blurRadius: 8,
+                // Blue Physical North Vector Transformed Indicator Needle (if provided in State 4)
+                if (physicalAngleInRadians != null)
+                  Transform.rotate(
+                    angle: physicalAngleInRadians,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Positioned(
+                          top: 20,
+                          child: Container(
+                            width: 3.5,
+                            height: 45,
+                            decoration: BoxDecoration(
+                              color: Colors.blueAccent,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                        const Positioned(
+                          top: 4,
+                          child: Text(
+                            'P',
+                            style: TextStyle(
+                              color: Colors.blueAccent,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                // Center Core & Luxury Digital Time Display
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.75),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.5), width: 1),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'LUXURY',
+                        style: TextStyle(
+                          color: Color(0xFFD4AF37),
+                          fontSize: 10,
+                          letterSpacing: 2.5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.timeString,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'monospace',
+                          color: Colors.white,
+                          shadows: [
+                            Shadow(
+                              color: Color(0xFFD4AF37),
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -660,8 +718,8 @@ class LuxuryCircularClock extends StatelessWidget {
               ],
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
