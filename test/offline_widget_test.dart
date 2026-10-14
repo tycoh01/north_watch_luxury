@@ -47,6 +47,15 @@ void main() {
       expect(find.text('App Version: v1.0.0'), findsOneWidget);
     });
 
+    testWidgets('Offline UI test verifies gold hour hand marker (H) on clock face', (WidgetTester tester) async {
+      await tester.pumpWidget(const MaterialApp(
+        home: OfflineWidget(),
+      ));
+
+      // Verify gold hour hand marker 'H' is rendered
+      expect(find.text('H'), findsOneWidget);
+    });
+
     testWidgets('OfflineWidget switches to State 2 (Sun Input) and State 3 (Compass North) correctly', (WidgetTester tester) async {
       final stubbedTime = DateTime(2026, 9, 28, 14, 30, 45);
 

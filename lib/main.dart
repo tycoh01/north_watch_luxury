@@ -265,6 +265,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
             LuxuryCircularClock(
               timeString: timeString,
               northAngle: northDirection,
+              hourHandAngle: H,
             ),
             const SizedBox(height: 20),
             Text(offlineStatus, style: const TextStyle(color: Colors.red)),
@@ -365,7 +366,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Watch Dial Method (Cinematic sun alignment ${_sunClockHours.toStringAsFixed(1)}h):\nAsouth = Asun - H/2 = ${southDirection.toStringAsFixed(1)}°\nAnorth = Asouth + 180 = ${northDirection.toStringAsFixed(1)}°',
+                    'Watch Dial Method (Cinematic sun alignment ${_sunClockHours.toStringAsFixed(1)}h):\nAnorth = Asun - H/2 = ${northDirection.toStringAsFixed(1)}°\nAsouth = Anorth + 180 = ${southDirection.toStringAsFixed(1)}°',
                     style: const TextStyle(fontSize: 14, color: Colors.black),
                     textAlign: TextAlign.center,
                   ),
@@ -373,11 +374,12 @@ class _OfflineWidgetState extends State<OfflineWidget> {
               ),
             ),
             const SizedBox(height: 30),
-            // State 3 clock with cinematic 3D tilt/pan, golden sunlight, and sun clock dial alignment
+            // State 3 clock with cinematic 3D tilt/pan, golden sunlight, hour hand H, and sun clock dial alignment
             LuxuryCircularClock(
               timeString: timeString,
               northAngle: northDirection,
               sunAzimuth: sunClockDialAngle,
+              hourHandAngle: H,
             ),
           ],
         );
@@ -413,16 +415,16 @@ class _OfflineWidgetState extends State<OfflineWidget> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Watch Dial South (Asun - H/2):', style: TextStyle(color: Colors.white70)),
-                      Text('${southDirection.toStringAsFixed(1)}°', style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
+                      const Text('Watch Dial North (Asun - H/2):', style: TextStyle(color: Colors.white70)),
+                      Text('${northDirection.toStringAsFixed(1)}°', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
                     ],
                   ),
                   const Divider(color: Colors.grey),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Watch Dial North (Red N):', style: TextStyle(color: Colors.white70)),
-                      Text('${northDirection.toStringAsFixed(1)}°', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
+                      const Text('Watch Dial South (North + 180):', style: TextStyle(color: Colors.white70)),
+                      Text('${southDirection.toStringAsFixed(1)}°', style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
                     ],
                   ),
                   const Divider(color: Colors.grey),
@@ -467,12 +469,13 @@ class _OfflineWidgetState extends State<OfflineWidget> {
               ),
             ),
             const SizedBox(height: 20),
-            // State 4 clock with cinematic 3D tilt/pan, golden sunlight, dual vectors, and sun clock dial alignment
+            // State 4 clock with cinematic 3D tilt/pan, golden sunlight, dual vectors, hour hand H, and sun clock dial alignment
             LuxuryCircularClock(
               timeString: timeString,
               northAngle: northDirection,
               physicalNorthAngle: physicalNorthHeading,
               sunAzimuth: sunClockDialAngle,
+              hourHandAngle: H,
             ),
           ],
         );
@@ -544,6 +547,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
               northAngle: northDirection,
               physicalNorthAngle: physicalNorthHeading,
               sunAzimuth: sunClockDialAngle,
+              hourHandAngle: H,
             ),
           ],
         );
@@ -556,6 +560,7 @@ class LuxuryCircularClock extends StatefulWidget {
   final double northAngle;
   final double? physicalNorthAngle;
   final double? sunAzimuth;
+  final double? hourHandAngle;
 
   const LuxuryCircularClock({
     super.key,
@@ -563,6 +568,7 @@ class LuxuryCircularClock extends StatefulWidget {
     required this.northAngle,
     this.physicalNorthAngle,
     this.sunAzimuth,
+    this.hourHandAngle,
   });
 
   @override
@@ -620,6 +626,9 @@ class _LuxuryCircularClockState extends State<LuxuryCircularClock> with SingleTi
         final double angleInRadians = widget.northAngle * (math.pi / 180.0);
         final double? physicalAngleInRadians = widget.physicalNorthAngle != null
             ? widget.physicalNorthAngle! * (math.pi / 180.0)
+            : null;
+        final double? hourHandAngleInRadians = widget.hourHandAngle != null
+            ? widget.hourHandAngle! * (math.pi / 180.0)
             : null;
 
         // Instantiate SunDialRing mathematical object (Iterable<int> Z/12Z)
@@ -770,6 +779,38 @@ class _LuxuryCircularClockState extends State<LuxuryCircularClock> with SingleTi
                             style: TextStyle(
                               color: Colors.blueAccent,
                               fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                // Gold Hour Hand Needle (H)
+                if (hourHandAngleInRadians != null)
+                  Transform.rotate(
+                    angle: hourHandAngleInRadians,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Positioned(
+                          top: 25,
+                          child: Container(
+                            width: 5,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFD4AF37),
+                              borderRadius: BorderRadius.circular(2.5),
+                            ),
+                          ),
+                        ),
+                        const Positioned(
+                          top: 6,
+                          child: Text(
+                            'H',
+                            style: TextStyle(
+                              color: Color(0xFFD4AF37),
+                              fontSize: 10,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
