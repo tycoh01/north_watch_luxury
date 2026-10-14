@@ -51,7 +51,7 @@ class _SunDialIterator implements Iterator<int> {
   }
 }
 
-enum ClockState { clockAndSun, sunInput, compassNorth, comparison }
+enum ClockState { clockAndSun, sunInput, compassNorth, comparison, calibration }
 
 class OfflineWidget extends StatefulWidget {
   final DateTime Function()? timeProvider;
@@ -71,7 +71,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
   late Timer _timer;
   late DateTime _currentTime;
   
-  // Four states management
+  // Five states management
   ClockState _currentState = ClockState.clockAndSun;
   double _sunClockHours = 12.0; // State 2: Sun direction represented in clock units (0 - 24 hours)
   final TextEditingController _sunController = TextEditingController(text: '12.0');
@@ -79,6 +79,12 @@ class _OfflineWidgetState extends State<OfflineWidget> {
   // Live physical sensor heading via sensors_plus
   double _sensorHeading = 0.0;
   StreamSubscription<MagnetometerEvent>? _magnetometerSubscription;
+
+  // Magnet Compass Calibration State (Hard-Iron & Soft-Iron)
+  bool _isCalibrating = false;
+  double _xMin = 0.0, _xMax = 0.0, _yMin = 0.0, _yMax = 0.0;
+  double _xOffset = 0.0, _yOffset = 0.0;
+  int _calibrationSamples = 0;
 
   DateTime get _now {
     final raw = widget.timeProvider?.call() ?? DateTime.now();
@@ -97,11 +103,30 @@ class _OfflineWidgetState extends State<OfflineWidget> {
       });
     });
 
-    // Listen to physical magnetometer events with an input/output smoothing filter loop (Android/iOS only)
+    // Listen to physical magnetometer events with hard-iron calibration & smoothing filter loop
     try {
       if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS)) {
         _magnetometerSubscription = magnetometerEvents.listen((MagnetometerEvent event) {
-          double rawHeading = (math.atan2(event.y, event.x) * (180.0 / math.pi) + 180.0) % 360.0;
+          if (_isCalibrating) {
+            if (_calibrationSamples == 0) {
+              _xMin = event.x;
+              _xMax = event.x;
+              _yMin = event.y;
+              _yMax = event.y;
+            } else {
+              _xMin = math.min(_xMin, event.x);
+              _xMax = math.max(_xMax, event.x);
+              _yMin = math.min(_yMin, event.y);
+              _yMax = math.max(_yMax, event.y);
+            }
+            _xOffset = (_xMax + _xMin) / 2.0;
+            _yOffset = (_yMax + _yMin) / 2.0;
+            _calibrationSamples++;
+          }
+
+          final double calX = event.x - _xOffset;
+          final double calY = event.y - _yOffset;
+          double rawHeading = (math.atan2(calY, calX) * (180.0 / math.pi) + 180.0) % 360.0;
           if (rawHeading < 0) {
             rawHeading += 360.0;
           }
@@ -161,7 +186,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
       ),
       body: Column(
         children: [
-          // State Selector Bar (Four States)
+          // State Selector Bar (Five States)
           Container(
             color: Colors.grey[900],
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
@@ -177,6 +202,8 @@ class _OfflineWidgetState extends State<OfflineWidget> {
                   _buildStateButton('3. Compass North', ClockState.compassNorth),
                   const SizedBox(width: 6),
                   _buildStateButton('4. North Compare', ClockState.comparison),
+                  const SizedBox(width: 6),
+                  _buildStateButton('5. Calibrate', ClockState.calibration),
                 ],
               ),
             ),
@@ -227,7 +254,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
           children: [
             const Icon(Icons.wb_sunny, size: 64, color: Colors.amber),
             const SizedBox(height: 10),
-            const Text('Sun Intensity: $offlineSun', style: TextStyle(fontSize: 20)),
+            Text('Sun Intensity: $offlineSun', style: const TextStyle(fontSize: 20)),
             const SizedBox(height: 10),
             Text(
               'Sun Vector (Asun: ${sunAzimuth.toStringAsFixed(1)}°, H: ${H.toStringAsFixed(1)}°): Elev ${sunElevation.toStringAsFixed(1)}°',
@@ -240,7 +267,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
               northAngle: northDirection,
             ),
             const SizedBox(height: 20),
-            const Text(offlineStatus, style: TextStyle(color: Colors.red)),
+            Text(offlineStatus, style: const TextStyle(color: Colors.red)),
             const SizedBox(height: 10),
             const Text('App Version: $appVersion', style: TextStyle(color: Colors.grey)),
           ],
@@ -449,6 +476,77 @@ class _OfflineWidgetState extends State<OfflineWidget> {
             ),
           ],
         );
+
+      case ClockState.calibration:
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'State 5: Magnet Compass Calibration',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.purpleAccent),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 15),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[900],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.purpleAccent, width: 2),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.compass_calibration, size: 48, color: Colors.purpleAccent),
+                  const SizedBox(height: 10),
+                  Text(
+                    _isCalibrating ? 'Calibration Active (Rotate phone in figure-8)...' : 'Calibration Idle',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _isCalibrating ? Colors.amber : Colors.greenAccent),
+                  ),
+                  const SizedBox(height: 10),
+                  Text('Samples Collected: $_calibrationSamples', style: const TextStyle(color: Colors.white70)),
+                  const SizedBox(height: 6),
+                  Text('Hard-Iron Offsets: X=${_xOffset.toStringAsFixed(2)}, Y=${_yOffset.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white70)),
+                  const SizedBox(height: 6),
+                  Text('Calibrated Heading: ${_sensorHeading.toStringAsFixed(1)}°', style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 18)),
+                  const SizedBox(height: 15),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: _isCalibrating ? Colors.red : Colors.purpleAccent, foregroundColor: Colors.white),
+                        onPressed: () {
+                          setState(() {
+                            _isCalibrating = !_isCalibrating;
+                          });
+                        },
+                        child: Text(_isCalibrating ? 'Stop Calibration' : 'Start Calibration'),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.grey[800], foregroundColor: Colors.white),
+                        onPressed: () {
+                          setState(() {
+                            _calibrationSamples = 0;
+                            _xMin = 0.0; _xMax = 0.0; _yMin = 0.0; _yMax = 0.0;
+                            _xOffset = 0.0; _yOffset = 0.0;
+                          });
+                        },
+                        child: const Text('Reset'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 25),
+            LuxuryCircularClock(
+              timeString: timeString,
+              northAngle: northDirection,
+              physicalNorthAngle: physicalNorthHeading,
+              sunAzimuth: sunClockDialAngle,
+            ),
+          ],
+        );
     }
   }
 }
@@ -525,7 +623,7 @@ class _LuxuryCircularClockState extends State<LuxuryCircularClock> with SingleTi
             : null;
 
         // Instantiate SunDialRing mathematical object (Iterable<int> Z/12Z)
-        const SunDialRing dialRing = SunDialRing(modulus: 12);
+        final SunDialRing dialRing = const SunDialRing(modulus: 12);
         final List<int> hours = dialRing.toList();
 
         return Transform(
