@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
@@ -96,17 +97,19 @@ class _OfflineWidgetState extends State<OfflineWidget> {
       });
     });
 
-    // Listen to physical magnetometer events with an input/output smoothing filter loop
+    // Listen to physical magnetometer events with an input/output smoothing filter loop (Android/iOS only)
     try {
-      _magnetometerSubscription = magnetometerEvents.listen((MagnetometerEvent event) {
-        double rawHeading = (math.atan2(event.y, event.x) * (180.0 / math.pi) + 180.0) % 360.0;
-        if (rawHeading < 0) {
-          rawHeading += 360.0;
-        }
-        setState(() {
-          _sensorHeading = (_sensorHeading * 0.8) + (rawHeading * 0.2);
+      if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS)) {
+        _magnetometerSubscription = magnetometerEvents.listen((MagnetometerEvent event) {
+          double rawHeading = (math.atan2(event.y, event.x) * (180.0 / math.pi) + 180.0) % 360.0;
+          if (rawHeading < 0) {
+            rawHeading += 360.0;
+          }
+          setState(() {
+            _sensorHeading = (_sensorHeading * 0.8) + (rawHeading * 0.2);
+          });
         });
-      });
+      }
     } catch (_) {
       // Fallback if sensors are not supported on current platform (e.g. desktop/tests)
     }
