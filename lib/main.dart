@@ -107,7 +107,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
     // Listen to physical magnetometer events with hard-iron calibration & smoothing filter loop
     try {
       if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS)) {
-        _magnetometerSubscription = magnetometerEvents.listen((MagnetometerEvent event) {
+        _magnetometerSubscription = magnetometerEventStream().listen((MagnetometerEvent event) {
           if (_isCalibrating) {
             if (_calibrationSamples == 0) {
               _xMin = event.x;
