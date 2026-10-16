@@ -584,11 +584,11 @@ class _OfflineWidgetState extends State<OfflineWidget> {
               onPressed: () async {
                 final Uri url = Uri.parse('https://twyahoo.buyee.jp/');
                 try {
-                  if (await canLaunchUrl(url)) {
-                    await launchUrl(url, mode: LaunchMode.externalApplication);
-                  }
+                  await launchUrl(url, mode: LaunchMode.externalApplication);
                 } catch (_) {
-                  // Fallback
+                  try {
+                    await launchUrl(url, mode: LaunchMode.platformDefault);
+                  } catch (_) {}
                 }
               },
             ),
