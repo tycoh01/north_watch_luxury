@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sensors_plus/sensors_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // Static offline variables
 const String appTitle = 'Offline Clock App';
@@ -51,7 +52,7 @@ class _SunDialIterator implements Iterator<int> {
   }
 }
 
-enum ClockState { clockAndSun, sunInput, compassNorth, comparison, calibration }
+enum ClockState { clockAndSun, sunInput, compassNorth, comparison, calibration, japanProxy }
 
 class OfflineWidget extends StatefulWidget {
   final DateTime Function()? timeProvider;
@@ -71,7 +72,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
   late Timer _timer;
   late DateTime _currentTime;
   
-  // Five states management
+  // Six states management
   ClockState _currentState = ClockState.clockAndSun;
   double _sunClockHours = 12.0; // State 2: Sun direction represented in clock units (0 - 24 hours)
   final TextEditingController _sunController = TextEditingController(text: '12.0');
@@ -163,10 +164,10 @@ class _OfflineWidgetState extends State<OfflineWidget> {
     final double H = 30.0 * hValue;
 
     // WATCH DIAL METHOD FORMULAS:
-    // South is halfway between hour hand H and 12 o'clock (0°) -> Asouth = (Asun - H/2) mod 360
-    final double southDirection = ((sunAzimuth - (H / 2.0)) % 360.0 + 360.0) % 360.0;
-    // North is the opposite direction of South -> Anorth = (Asouth + 180) mod 360
-    final double northDirection = ((southDirection + 180.0) % 360.0 + 360.0) % 360.0;
+    // North is halfway between hour hand H and 12 o'clock (0°) -> Anorth = (Asun - H/2) mod 360
+    final double northDirection = ((sunAzimuth - (H / 2.0)) % 360.0 + 360.0) % 360.0;
+    // South is the opposite direction of North -> Asouth = (Anorth + 180) mod 360
+    final double southDirection = ((northDirection + 180.0) % 360.0 + 360.0) % 360.0;
 
     // Format clock representation (HH:MM:SS)
     final String timeString =
@@ -186,7 +187,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
       ),
       body: Column(
         children: [
-          // State Selector Bar (Five States)
+          // State Selector Bar (Six States)
           Container(
             color: Colors.grey[900],
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
@@ -204,6 +205,8 @@ class _OfflineWidgetState extends State<OfflineWidget> {
                   _buildStateButton('4. North Compare', ClockState.comparison),
                   const SizedBox(width: 6),
                   _buildStateButton('5. Calibrate', ClockState.calibration),
+                  const SizedBox(width: 6),
+                  _buildStateButton('6. 日本代購', ClockState.japanProxy),
                 ],
               ),
             ),
@@ -548,6 +551,46 @@ class _OfflineWidgetState extends State<OfflineWidget> {
               physicalNorthAngle: physicalNorthHeading,
               sunAzimuth: sunClockDialAngle,
               hourHandAngle: H,
+            ),
+          ],
+        );
+
+      case ClockState.japanProxy:
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.shopping_bag, size: 64, color: Colors.pinkAccent),
+            const SizedBox(height: 10),
+            const Text(
+              '日本代購 (Japan Yahoo Buyee)',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.pinkAccent),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 15),
+            const Text(
+              'Access Japanese Yahoo Auctions and Shopping proxy services securely via Buyee.',
+              style: TextStyle(fontSize: 16, color: Colors.black87),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 30),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.pinkAccent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              icon: const Icon(Icons.open_in_browser),
+              label: const Text('Open https://twyahoo.buyee.jp/', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              onPressed: () async {
+                final Uri url = Uri.parse('https://twyahoo.buyee.jp/');
+                try {
+                  if (await canLaunchUrl(url)) {
+                    await launchUrl(url, mode: LaunchMode.externalApplication);
+                  }
+                } catch (_) {
+                  // Fallback
+                }
+              },
             ),
           ],
         );
