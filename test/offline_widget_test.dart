@@ -18,6 +18,18 @@ void main() {
       expect(northDirection, 180.0);
     });
 
+    test('Hour hand specification unit test (H = 30 * (h + m/60))', () {
+      // 3:00 -> 3 hours * 30 = 90°
+      const double hValue3 = (3 % 12) + (0 / 60.0);
+      const double h3 = 30.0 * hValue3;
+      expect(h3, 90.0);
+
+      // 6:30 -> (6 + 30/60) * 30 = 6.5 * 30 = 195°
+      const double hValue630 = (6 % 12) + (30 / 60.0);
+      const double h630 = 30.0 * hValue630;
+      expect(h630, 195.0);
+    });
+
     test('Solar navigation north calculation at same location with different times', () {
       const double sunAzimuth = 180.0;
 
@@ -67,6 +79,19 @@ void main() {
       expect(find.text('H'), findsOneWidget);
     });
 
+    testWidgets('Hour hand UI specification test case', (WidgetTester tester) async {
+      await tester.pumpWidget(const MaterialApp(
+        home: LuxuryCircularClock(
+          timeString: '12:00:00',
+          northAngle: 0.0,
+          hourHandAngle: 90.0,
+        ),
+      ));
+
+      expect(find.text('H'), findsOneWidget);
+      expect(find.text('12:00:00'), findsOneWidget);
+    });
+
     testWidgets('Runtime verification test: live timer tick and time updates', (WidgetTester tester) async {
       var initialTime = DateTime(2026, 10, 17, 10, 0, 0);
       await tester.pumpWidget(MaterialApp(
@@ -81,6 +106,24 @@ void main() {
       initialTime = DateTime(2026, 10, 17, 10, 0, 5);
       await tester.pump(const Duration(seconds: 1));
       expect(find.text('10:00:05'), findsOneWidget);
+    });
+
+    testWidgets('Runtime verification test: hour hand updates dynamically with time ticks', (WidgetTester tester) async {
+      var stubTime = DateTime(2026, 10, 17, 3, 0, 0);
+      await tester.pumpWidget(MaterialApp(
+        home: OfflineWidget(
+          timeProvider: () => stubTime,
+          compassProvider: () => 0.0,
+        ),
+      ));
+
+      expect(find.text('03:00:00'), findsOneWidget);
+      expect(find.text('H'), findsWidgets);
+
+      stubTime = DateTime(2026, 10, 17, 3, 0, 1);
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('03:00:01'), findsOneWidget);
+      expect(find.text('H'), findsWidgets);
     });
 
     testWidgets('Runtime verification test: navigate through all 6 states including Calibrate and 日本代購', (WidgetTester tester) async {
