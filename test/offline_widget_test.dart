@@ -20,13 +20,13 @@ void main() {
 
     test('Hour hand specification unit test (H = 30 * (h + m/60))', () {
       // 3:00 -> 3 hours * 30 = 90°
-      const double hValue3 = (3 % 12) + (0 / 60.0);
-      const double h3 = 30.0 * hValue3;
+      final double hValue3 = (3 % 12) + (0 / 60.0);
+      final double h3 = 30.0 * hValue3;
       expect(h3, 90.0);
 
       // 6:30 -> (6 + 30/60) * 30 = 6.5 * 30 = 195°
-      const double hValue630 = (6 % 12) + (30 / 60.0);
-      const double h630 = 30.0 * hValue630;
+      final double hValue630 = (6 % 12) + (30 / 60.0);
+      final double h630 = 30.0 * hValue630;
       expect(h630, 195.0);
     });
 
@@ -77,6 +77,22 @@ void main() {
 
       // Verify gold hour hand marker 'H' is rendered
       expect(find.text('H'), findsOneWidget);
+    });
+
+    testWidgets('Enhanced finder test case for luxury clock, sun icon, and input fields', (WidgetTester tester) async {
+      await tester.pumpWidget(const MaterialApp(
+        home: OfflineWidget(),
+      ));
+
+      // Verify widget finders by type and icon
+      expect(find.byType(LuxuryCircularClock), findsOneWidget);
+      expect(find.byIcon(Icons.wb_sunny), findsOneWidget);
+
+      // Navigate to State 2 (Sun Input) and verify TextField and ElevatedButton finders
+      await tester.tap(find.text('2. Sun Input'));
+      await tester.pumpAndSettle();
+      expect(find.byType(TextField), findsOneWidget);
+      expect(find.byType(ElevatedButton), findsWidgets);
     });
 
     testWidgets('Hour hand UI specification test case', (WidgetTester tester) async {
