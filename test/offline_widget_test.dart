@@ -124,6 +124,21 @@ void main() {
       expect(find.text('10:00:05'), findsOneWidget);
     });
 
+    testWidgets('Dedicated timer test case: periodic time progression and UI re-render', (WidgetTester tester) async {
+      var fakeTime = DateTime(2026, 11, 13, 12, 0, 0);
+      await tester.pumpWidget(MaterialApp(
+        home: OfflineWidget(
+          timeProvider: () => fakeTime,
+        ),
+      ));
+
+      expect(find.text('12:00:00'), findsOneWidget);
+
+      fakeTime = DateTime(2026, 11, 13, 12, 0, 3);
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('12:00:03'), findsOneWidget);
+    });
+
     testWidgets('Runtime verification test: hour hand updates dynamically with time ticks', (WidgetTester tester) async {
       var stubTime = DateTime(2026, 10, 17, 3, 0, 0);
       await tester.pumpWidget(MaterialApp(
