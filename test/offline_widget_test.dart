@@ -238,5 +238,37 @@ void main() {
 
       expect(find.textContaining('Live Physical Compass North:'), findsOneWidget);
     });
+
+    testWidgets('Test double demonstration: Spy and Fake in widget tests', (WidgetTester tester) async {
+      int timeProviderCallCount = 0;
+      int compassProviderCallCount = 0;
+
+      // Spy / Fake providers
+      DateTime fakeTimeProvider() {
+        timeProviderCallCount++;
+        return DateTime(2026, 11, 13, 14, 0, 0);
+      }
+
+      double fakeCompassProvider() {
+        compassProviderCallCount++;
+        return 180.0;
+      }
+
+      await tester.pumpWidget(MaterialApp(
+        home: OfflineWidget(
+          timeProvider: fakeTimeProvider,
+          compassProvider: fakeCompassProvider,
+        ),
+      ));
+
+      expect(find.text('14:00:00'), findsOneWidget);
+      expect(timeProviderCallCount, greaterThan(0));
+
+      // Navigate to State 3 (Compass North) to trigger compass provider spy
+      await tester.tap(find.text('3. Compass North'));
+      await tester.pumpAndSettle();
+
+      expect(compassProviderCallCount, greaterThan(0));
+    });
   });
 }
