@@ -20,13 +20,13 @@ void main() {
 
     test('Hour hand specification unit test (H = 30 * (h + m/60))', () {
       // 3:00 -> 3 hours * 30 = 90°
-      final double hValue3 = (3 % 12) + (0 / 60.0);
-      final double h3 = 30.0 * hValue3;
+      const double hValue3 = (3 % 12) + (0 / 60.0);
+      const double h3 = 30.0 * hValue3;
       expect(h3, 90.0);
 
       // 6:30 -> (6 + 30/60) * 30 = 6.5 * 30 = 195°
-      final double hValue630 = (6 % 12) + (30 / 60.0);
-      final double h630 = 30.0 * hValue630;
+      const double hValue630 = (6 % 12) + (30 / 60.0);
+      const double h630 = 30.0 * hValue630;
       expect(h630, 195.0);
     });
 
