@@ -20,13 +20,13 @@ void main() {
 
     test('Hour hand specification unit test (H = 30 * (h + m/60))', () {
       // 3:00 -> 3 hours * 30 = 90°
-      const double hValue3 = (3 % 12) + (0 / 60.0);
-      const double h3 = 30.0 * hValue3;
+      final double hValue3 = (3 % 12) + (0 / 60.0);
+      final double h3 = 30.0 * hValue3;
       expect(h3, 90.0);
 
       // 6:30 -> (6 + 30/60) * 30 = 6.5 * 30 = 195°
-      const double hValue630 = (6 % 12) + (30 / 60.0);
-      const double h630 = 30.0 * hValue630;
+      final double hValue630 = (6 % 12) + (30 / 60.0);
+      final double h630 = 30.0 * hValue630;
       expect(h630, 195.0);
     });
 
@@ -188,7 +188,7 @@ void main() {
       final calibrateButton = find.text('5. Calibrate');
       await tester.tap(calibrateButton);
       await tester.pumpAndSettle();
-      expect(find.text('State 5: Magnet Compass Calibration'), findsOneWidget);
+      expect(find.text('State 5: Stabilized Compass Calibration'), findsOneWidget);
 
       // State 6: 日本代購
       final japanButton = find.text('6. 日本代購');
@@ -219,7 +219,7 @@ void main() {
       await tester.tap(find.text('3. Compass North'));
       await tester.pumpAndSettle();
       expect(find.text('Compass North Calibration Mode'), findsOneWidget);
-      expect(find.textContaining('Live Physical Compass North:'), findsOneWidget);
+      expect(find.textContaining('Stabilized Compass North'), findsOneWidget);
     });
 
     testWidgets('testNorth verifies calculated north direction across same location with different times', (WidgetTester tester) async {
@@ -236,7 +236,7 @@ void main() {
       await tester.tap(find.text('3. Compass North'));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Live Physical Compass North:'), findsOneWidget);
+      expect(find.textContaining('Stabilized Compass North'), findsOneWidget);
     });
 
     testWidgets('Test double demonstration: Spy and Fake in widget tests', (WidgetTester tester) async {
