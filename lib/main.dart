@@ -132,7 +132,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
             rawHeading += 360.0;
           }
           setState(() {
-            _sensorHeading = (_sensorHeading * 0.95) + (rawHeading * 0.05);
+            _sensorHeading = rawHeading;
           });
         });
       }

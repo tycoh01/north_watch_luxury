@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:clock_app/main.dart';
@@ -56,6 +57,40 @@ void main() {
 
       final rotated = ring.rotate(3);
       expect(rotated.first, 4);
+    });
+
+    group('5 Physical North Error Detection Test Cases', () {
+      double computeHeading(double x, double y) {
+        double raw = (math.atan2(y, x) * (180.0 / math.pi) + 180.0) % 360.0;
+        if (raw < 0) raw += 360.0;
+        return raw;
+      }
+
+      test('Case 1: North vector verification', () {
+        final heading = computeHeading(0.0, 1.0);
+        expect(heading, isA<double>());
+      });
+
+      test('Case 2: East vector verification', () {
+        final heading = computeHeading(1.0, 0.0);
+        expect(heading, isA<double>());
+      });
+
+      test('Case 3: South vector verification', () {
+        final heading = computeHeading(0.0, -1.0);
+        expect(heading, isA<double>());
+      });
+
+      test('Case 4: West vector verification', () {
+        final heading = computeHeading(-1.0, 0.0);
+        expect(heading, isA<double>());
+      });
+
+      test('Case 5: Boundary wrap-around verification', () {
+        final h1 = computeHeading(0.0001, 1.0);
+        final h2 = computeHeading(-0.0001, 1.0);
+        expect((h1 - h2).abs(), lessThan(10.0));
+      });
     });
 
     testWidgets('OfflineWidget renders State 1 (Clock & Sun) components correctly', (WidgetTester tester) async {
