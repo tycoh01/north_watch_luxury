@@ -77,9 +77,79 @@ class _OfflineWidgetState extends State<OfflineWidget> {
   double _sunClockHours = 12.0; // State 2: Sun direction represented in clock units (0 - 24 hours)
   final TextEditingController _sunController = TextEditingController(text: '12.0');
 
-  // Live physical sensor heading via sensors_plus with hard-iron calibration & EMA smoothing
+  // Live physical sensor heading via sensors_plus (Tilt-compensated compass using accelerometer + magnetometer & circular angular smoothing)
   double _sensorHeading = 0.0;
+  StreamSubscription<AccelerometerEvent>? _accelerometerSubscription;
   StreamSubscription<MagnetometerEvent>? _magnetometerSubscription;
+
+  AccelerometerEvent? _lastAccelerometer;
+  MagnetometerEvent? _lastMagnetometer;
+
+  double _smoothedSin = 0.0;
+  double _smoothedCos = 0.0;
+  bool _hasInitializedHeading = false;
+
+  void _updateHeading(double rawHeadingDegrees) {
+    final double rad = rawHeadingDegrees * (math.pi / 180.0);
+    final double s = math.sin(rad);
+    final double c = math.cos(rad);
+
+    if (!_hasInitializedHeading) {
+      _smoothedSin = s;
+      _smoothedCos = c;
+      _hasInitializedHeading = true;
+    } else {
+      const double alpha = 0.2;
+      _smoothedSin = _smoothedSin * (1.0 - alpha) + s * alpha;
+      _smoothedCos = _smoothedCos * (1.0 - alpha) + c * alpha;
+    }
+
+    final double smoothedRad = math.atan2(_smoothedSin, _smoothedCos);
+    double smoothedDeg = smoothedRad * (180.0 / math.pi);
+    if (smoothedDeg < 0) {
+      smoothedDeg += 360.0;
+    }
+    setState(() {
+      _sensorHeading = smoothedDeg;
+    });
+  }
+
+  void _updateTiltCompensatedHeading() {
+    if (_lastAccelerometer == null || _lastMagnetometer == null) return;
+
+    final ax = _lastAccelerometer!.x;
+    final ay = _lastAccelerometer!.y;
+    final az = _lastAccelerometer!.z;
+
+    final mx = _lastMagnetometer!.x;
+    final my = _lastMagnetometer!.y;
+    final mz = _lastMagnetometer!.z;
+
+    final normA = math.sqrt(ax * ax + ay * ay + az * az);
+    if (normA == 0) return;
+    final axN = ax / normA;
+    final ayN = ay / normA;
+    final azN = az / normA;
+
+    final pitch = math.asin(-axN);
+    final roll = math.atan2(ayN, azN);
+
+    final cosPitch = math.cos(pitch);
+    final sinPitch = math.sin(pitch);
+    final cosRoll = math.cos(roll);
+    final sinRoll = math.sin(roll);
+
+    final Xh = mx * cosPitch + my * sinRoll * sinPitch + mz * cosRoll * sinPitch;
+    final Yh = my * cosRoll - mz * sinRoll;
+
+    double rawHeading = math.atan2(Yh, Xh) * (180.0 / math.pi);
+    if (rawHeading < 0) {
+      rawHeading += 360.0;
+    }
+    // Correct 180-degree inversion (physical north pointing to south)
+    rawHeading = (rawHeading + 180.0) % 360.0;
+    _updateHeading(rawHeading);
+  }
 
   // Magnet Compass Calibration State (Hard-Iron & Soft-Iron)
   bool _isCalibrating = false;
@@ -104,10 +174,16 @@ class _OfflineWidgetState extends State<OfflineWidget> {
       });
     });
 
-    // Listen to physical magnetometer events with hard-iron calibration & EMA low-pass filtering
+    // Listen to accelerometer and magnetometer streams for tilt-compensated compass heading
     try {
       if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS)) {
+        _accelerometerSubscription = accelerometerEventStream().listen((AccelerometerEvent event) {
+          _lastAccelerometer = event;
+          _updateTiltCompensatedHeading();
+        });
+
         _magnetometerSubscription = magnetometerEventStream().listen((MagnetometerEvent event) {
+          _lastMagnetometer = event;
           if (_isCalibrating) {
             if (_calibrationSamples == 0) {
               _xMin = event.x;
@@ -124,16 +200,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
             _yOffset = (_yMax + _yMin) / 2.0;
             _calibrationSamples++;
           }
-
-          final double calX = event.x - _xOffset;
-          final double calY = event.y - _yOffset;
-          double rawHeading = (math.atan2(calY, calX) * (180.0 / math.pi) + 180.0) % 360.0;
-          if (rawHeading < 0) {
-            rawHeading += 360.0;
-          }
-          setState(() {
-            _sensorHeading = rawHeading;
-          });
+          _updateTiltCompensatedHeading();
         });
       }
     } catch (_) {
@@ -145,6 +212,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
   void dispose() {
     _timer.cancel();
     _sunController.dispose();
+    _accelerometerSubscription?.cancel();
     _magnetometerSubscription?.cancel();
     super.dispose();
   }

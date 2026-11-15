@@ -13,7 +13,7 @@ void main() {
 
       // State 1: Clock & Sun
       expect(find.text('Offline Clock App'), findsOneWidget);
-      expect(find.byType(LuxuryCircularClock), findsOneWidget);
+      expect(find.byType(app.LuxuryCircularClock), findsOneWidget);
 
       // State 2: Sun Input
       await tester.tap(find.text('2. Sun Input'));
@@ -27,6 +27,10 @@ void main() {
       expect(find.textContaining('Stabilized Compass North'), findsOneWidget);
       expect(find.textContaining('°'), findsWidgets); // Verify degree format correctness
 
+      // Scroll horizontal bar to reveal State 4
+      await tester.drag(find.byType(SingleChildScrollView).first, const Offset(-200, 0));
+      await tester.pumpAndSettle();
+
       // State 4: North Compare (Verifies physical vs calculated correctness)
       await tester.tap(find.text('4. North Compare'));
       await tester.pumpAndSettle();
@@ -36,7 +40,7 @@ void main() {
       expect(find.text('Variance / Delta:'), findsOneWidget);
 
       // Scroll horizontal bar further to reveal State 5 and State 6
-      await tester.drag(find.byType(SingleChildScrollView).first, const Offset(-400, 0));
+      await tester.drag(find.byType(SingleChildScrollView).first, const Offset(-300, 0));
       await tester.pumpAndSettle();
 
       // State 5: Calibrate (Verifies hardware calibration trigger and physical correctness checks)
@@ -59,6 +63,20 @@ void main() {
       await tester.tap(japanButton);
       await tester.pumpAndSettle();
       expect(find.text('日本代購 (Japan Yahoo Buyee)'), findsOneWidget);
+    });
+
+    testWidgets('Verify physical north is fixed when using stubbed compass provider', (WidgetTester tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: app.OfflineWidget(
+          compassProvider: () => 45.0,
+        ),
+      ));
+
+      // Navigate to State 3: Compass North
+      await tester.tap(find.text('3. Compass North'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('45.0°'), findsOneWidget);
     });
   });
 }
