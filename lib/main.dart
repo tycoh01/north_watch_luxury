@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:sensors_plus/sensors_plus.dart';
+import 'package:flutter_compass/flutter_compass.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 // Static offline variables
@@ -77,19 +77,26 @@ class _OfflineWidgetState extends State<OfflineWidget> {
   double _sunClockHours = 12.0; // State 2: Sun direction represented in clock units (0 - 24 hours)
   final TextEditingController _sunController = TextEditingController(text: '12.0');
 
-  // Live physical sensor heading via sensors_plus (Tilt-compensated compass using accelerometer + magnetometer & circular angular smoothing)
+  // Live physical sensor heading via flutter_compass (Native system-fused sensors: Android Rotation Vector / iOS Core Motion CLHeading)
   double _sensorHeading = 0.0;
-  StreamSubscription<AccelerometerEvent>? _accelerometerSubscription;
-  StreamSubscription<MagnetometerEvent>? _magnetometerSubscription;
-
-  AccelerometerEvent? _lastAccelerometer;
-  MagnetometerEvent? _lastMagnetometer;
+  double _magneticDeclination = 0.0; // Magnetic declination offset for True/Geographic North
+  bool _hasMagneticInterference = false; // Anomaly detection for cases, magnets, metal
+  StreamSubscription<CompassEvent>? _compassSubscription;
 
   double _smoothedSin = 0.0;
   double _smoothedCos = 0.0;
   bool _hasInitializedHeading = false;
 
   void _updateHeading(double rawHeadingDegrees) {
+    // Deadband filter: ignore micro-jitter changes < 0.5 degrees when stationary
+    if (_hasInitializedHeading) {
+      double diff = (rawHeadingDegrees - _sensorHeading).abs();
+      if (diff > 180.0) diff = 360.0 - diff;
+      if (diff < 0.5) {
+        return;
+      }
+    }
+
     final double rad = rawHeadingDegrees * (math.pi / 180.0);
     final double s = math.sin(rad);
     final double c = math.cos(rad);
@@ -99,7 +106,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
       _smoothedCos = c;
       _hasInitializedHeading = true;
     } else {
-      const double alpha = 0.2;
+      const double alpha = 0.2; // Low-pass / complementary smoothing factor
       _smoothedSin = _smoothedSin * (1.0 - alpha) + s * alpha;
       _smoothedCos = _smoothedCos * (1.0 - alpha) + c * alpha;
     }
@@ -112,43 +119,6 @@ class _OfflineWidgetState extends State<OfflineWidget> {
     setState(() {
       _sensorHeading = smoothedDeg;
     });
-  }
-
-  void _updateTiltCompensatedHeading() {
-    if (_lastAccelerometer == null || _lastMagnetometer == null) return;
-
-    final ax = _lastAccelerometer!.x;
-    final ay = _lastAccelerometer!.y;
-    final az = _lastAccelerometer!.z;
-
-    final mx = _lastMagnetometer!.x;
-    final my = _lastMagnetometer!.y;
-    final mz = _lastMagnetometer!.z;
-
-    final normA = math.sqrt(ax * ax + ay * ay + az * az);
-    if (normA == 0) return;
-    final axN = ax / normA;
-    final ayN = ay / normA;
-    final azN = az / normA;
-
-    final pitch = math.asin(-axN);
-    final roll = math.atan2(ayN, azN);
-
-    final cosPitch = math.cos(pitch);
-    final sinPitch = math.sin(pitch);
-    final cosRoll = math.cos(roll);
-    final sinRoll = math.sin(roll);
-
-    final Xh = mx * cosPitch + my * sinRoll * sinPitch + mz * cosRoll * sinPitch;
-    final Yh = my * cosRoll - mz * sinRoll;
-
-    double rawHeading = math.atan2(Yh, Xh) * (180.0 / math.pi);
-    if (rawHeading < 0) {
-      rawHeading += 360.0;
-    }
-    // Correct 180-degree inversion (physical north pointing to south)
-    rawHeading = (rawHeading + 180.0) % 360.0;
-    _updateHeading(rawHeading);
   }
 
   // Magnet Compass Calibration State (Hard-Iron & Soft-Iron)
@@ -174,33 +144,29 @@ class _OfflineWidgetState extends State<OfflineWidget> {
       });
     });
 
-    // Listen to accelerometer and magnetometer streams for tilt-compensated compass heading
+    // Subscribe to native system-fused compass events (Android Rotation Vector / iOS Core Motion CLHeading)
     try {
       if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS)) {
-        _accelerometerSubscription = accelerometerEventStream().listen((AccelerometerEvent event) {
-          _lastAccelerometer = event;
-          _updateTiltCompensatedHeading();
-        });
-
-        _magnetometerSubscription = magnetometerEventStream().listen((MagnetometerEvent event) {
-          _lastMagnetometer = event;
-          if (_isCalibrating) {
-            if (_calibrationSamples == 0) {
-              _xMin = event.x;
-              _xMax = event.x;
-              _yMin = event.y;
-              _yMax = event.y;
+        _compassSubscription = FlutterCompass.events?.listen((CompassEvent event) {
+          final double? heading = event.heading;
+          final double? accuracy = event.accuracy;
+          if (heading != null) {
+            if (accuracy != null && accuracy < 0) {
+              _hasMagneticInterference = true;
             } else {
-              _xMin = math.min(_xMin, event.x);
-              _xMax = math.max(_xMax, event.x);
-              _yMin = math.min(_yMin, event.y);
-              _yMax = math.max(_yMax, event.y);
+              _hasMagneticInterference = false;
             }
-            _xOffset = (_xMax + _xMin) / 2.0;
-            _yOffset = (_yMax + _yMin) / 2.0;
-            _calibrationSamples++;
+
+            if (_isCalibrating) {
+              _calibrationSamples++;
+            }
+
+            double correctedHeading = (heading + _magneticDeclination) % 360.0;
+            if (correctedHeading < 0) {
+              correctedHeading += 360.0;
+            }
+            _updateHeading(correctedHeading);
           }
-          _updateTiltCompensatedHeading();
         });
       }
     } catch (_) {
@@ -212,8 +178,7 @@ class _OfflineWidgetState extends State<OfflineWidget> {
   void dispose() {
     _timer.cancel();
     _sunController.dispose();
-    _accelerometerSubscription?.cancel();
-    _magnetometerSubscription?.cancel();
+    _compassSubscription?.cancel();
     super.dispose();
   }
 
@@ -581,6 +546,16 @@ class _OfflineWidgetState extends State<OfflineWidget> {
                   Text('Samples Filtered: $_calibrationSamples', style: const TextStyle(color: Colors.white70)),
                   const SizedBox(height: 6),
                   Text('Stabilized Heading: ${_sensorHeading.toStringAsFixed(1)}°', style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 18)),
+                  if (_hasMagneticInterference) ...[
+                    const SizedBox(height: 8),
+                    const Text(
+                      '⚠️ Magnetic Interference Detected!\n(Check for magnetic cases, metal, or electronics)',
+                      style: TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                  const SizedBox(height: 6),
+                  Text('Magnetic Declination: ${_magneticDeclination.toStringAsFixed(1)}°', style: const TextStyle(color: Colors.white70, fontSize: 13)),
                   const SizedBox(height: 15),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
