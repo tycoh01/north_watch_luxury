@@ -4,6 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_compass/flutter_compass.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:geomag/geomag.dart';
+
+// Fixed reference location (decimal degrees)
+const double referenceLatitude = 24.953;
+const double referenceLongitude = 121.225;
 
 // Static offline variables
 const String appTitle = 'Offline Clock App';
@@ -137,6 +142,18 @@ class _OfflineWidgetState extends State<OfflineWidget> {
   @override
   void initState() {
     super.initState();
+
+  // Calculate magnetic declination offline using the fixed coordinates.
+  final result = GeoMag().calculate(
+    referenceLatitude,
+    referenceLongitude,
+    0.0,
+    DateTime.now(),
+  );
+
+  _magneticDeclination = result.dec;
+
+
     _currentTime = _now;
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
@@ -150,6 +167,9 @@ class _OfflineWidgetState extends State<OfflineWidget> {
         _compassSubscription = FlutterCompass.events?.listen((CompassEvent event) {
           final double? heading = event.heading;
           final double? accuracy = event.accuracy;
+          debugPrint(
+  'COMPASS raw=$heading accuracy=$accuracy',
+);
           if (heading != null) {
             if (accuracy != null && accuracy < 0) {
               _hasMagneticInterference = true;
@@ -710,8 +730,8 @@ class _LuxuryCircularClockState extends State<LuxuryCircularClock> with SingleTi
 
         final double angleInRadians = widget.northAngle * (math.pi / 180.0);
         final double? physicalAngleInRadians = widget.physicalNorthAngle != null
-            ? widget.physicalNorthAngle! * (math.pi / 180.0)
-            : null;
+    ? -widget.physicalNorthAngle! * (math.pi / 180.0)
+    : null;
         final double? hourHandAngleInRadians = widget.hourHandAngle != null
             ? widget.hourHandAngle! * (math.pi / 180.0)
             : null;
